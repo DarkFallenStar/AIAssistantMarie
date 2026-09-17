@@ -11,7 +11,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { DEFAULT_BACKEND_URL, DEFAULT_LAN_IP, DEFAULT_PORT } from '../config';
-import { checkBackendHealth, HealthResponse, normalizeUrl } from '../services/api';
+import { checkBackendHealth, sendChatMessage, HealthResponse, normalizeUrl } from '../services/api';
 
 interface LogEntry {
   id: string;
@@ -22,64 +22,86 @@ interface LogEntry {
 
 export default function ConnectionDiagnosticScreen() {
   const [backendUrl, setBackendUrl] = useState<string>(DEFAULT_BACKEND_URL);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoadingHealth, setIsLoadingHealth] = useState<boolean>(false);
   const [healthData, setHealthData] = useState<HealthResponse | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [healthError, setHealthError] = useState<string | null>(null);
+
+  // Chat Test State (Fase 2)
+  const [chatInput, setChatInput] = useState<string>('Hola');
+  const [chatResponse, setChatResponse] = useState<string | null>(null);
+  const [isSendingChat, setIsSendingChat] = useState<boolean>(false);
+
   const [logs, setLogs] = useState<LogEntry[]>([]);
 
   const addLog = (type: 'info' | 'success' | 'error', message: string) => {
     const timeStr = new Date().toLocaleTimeString();
     setLogs((prev) => [
       { id: Math.random().toString(), time: timeStr, type, message },
-      ...prev.slice(0, 15), // keep last 15 logs
+      ...prev.slice(0, 15),
     ]);
   };
 
-  const testConnection = async (targetUrl?: string) => {
+  const testHealth = async (targetUrl?: string) => {
     const urlToTest = normalizeUrl(targetUrl || backendUrl);
-    setIsLoading(true);
-    setErrorMsg(null);
-    addLog('info', `Conectando con: ${urlToTest}/api/health ...`);
+    setIsLoadingHealth(true);
+    setHealthError(null);
+    addLog('info', `GET ${urlToTest}/health ...`);
 
     try {
       const data = await checkBackendHealth(urlToTest);
       setHealthData(data);
-      addLog('success', `Conexión exitosa (${data.latencyMs}ms) - Servidor: ${data.service} v${data.version}`);
+      addLog('success', `Health OK (${data.latencyMs}ms): status = "${data.status}"`);
     } catch (err: any) {
       setHealthData(null);
-      setErrorMsg(err.message);
-      addLog('error', `Fallo de conexión: ${err.message}`);
+      setHealthError(err.message);
+      addLog('error', `Health Error: ${err.message}`);
     } finally {
-      setIsLoading(false);
+      setIsLoadingHealth(false);
+    }
+  };
+
+  const testChat = async () => {
+    if (!chatInput.trim()) return;
+    const urlToTest = normalizeUrl(backendUrl);
+    setIsSendingChat(true);
+    addLog('info', `POST ${urlToTest}/chat con: "${chatInput}" ...`);
+
+    try {
+      const reply = await sendChatMessage(urlToTest, chatInput);
+      setChatResponse(reply);
+      addLog('success', `Chat Responde: "${reply}"`);
+    } catch (err: any) {
+      addLog('error', `Chat Error: ${err.message}`);
+    } finally {
+      setIsSendingChat(false);
     }
   };
 
   useEffect(() => {
-    // Auto test on initial render
-    testConnection();
+    testHealth();
   }, []);
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
+      <StatusBar barStyle="light-content" backgroundColor="#090d16" />
       <ScrollView contentContainerStyle={styles.container}>
         
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerSubtitle}>FASE 1 • ARQUITECTURA BASE</Text>
+          <Text style={styles.headerSubtitle}>FASE 2 • BACKEND MÍNIMO</Text>
           <Text style={styles.headerTitle}>Personal Assistant AI</Text>
           <Text style={styles.headerDescription}>
-            Diagnóstico de conectividad móvil ↔ backend
+            Pruebas de endpoints GET /health y POST /chat
           </Text>
         </View>
 
-        {/* Status Card */}
+        {/* Health Status Card */}
         <View
           style={[
             styles.card,
             healthData
               ? styles.cardSuccess
-              : errorMsg
+              : healthError
               ? styles.cardError
               : styles.cardNeutral,
           ]}
@@ -90,16 +112,16 @@ export default function ConnectionDiagnosticScreen() {
                 styles.statusDot,
                 healthData
                   ? styles.dotOnline
-                  : isLoading
+                  : isLoadingHealth
                   ? styles.dotPending
                   : styles.dotOffline,
               ]}
             />
             <Text style={styles.statusTitle}>
-              {isLoading
-                ? 'Comprobando conexión...'
+              {isLoadingHealth
+                ? 'Comprobando GET /health...'
                 : healthData
-                ? 'Backend Conectado'
+                ? `Backend Online (status: ${healthData.status})`
                 : 'Backend Desconectado'}
             </Text>
             {healthData && (
@@ -109,42 +131,62 @@ export default function ConnectionDiagnosticScreen() {
             )}
           </View>
 
-          {healthData ? (
-            <View style={styles.detailsContainer}>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Servicio:</Text>
-                <Text style={styles.detailValue}>{healthData.service}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Versión:</Text>
-                <Text style={styles.detailValue}>{healthData.version}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Proveedor LLM:</Text>
-                <Text style={styles.detailValueHighlight}>{healthData.llm_provider}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Modelo:</Text>
-                <Text style={styles.detailValue}>{healthData.llm_model}</Text>
-              </View>
-            </View>
-          ) : errorMsg ? (
+          {healthError && (
             <View style={styles.errorBox}>
-              <Text style={styles.errorText}>{errorMsg}</Text>
-              <Text style={styles.errorHelp}>
-                • Verifica que el backend de FastAPI esté corriendo.{'\n'}
-                • Si pruebas en Android físico, asegúrate de estar en la misma red Wi-Fi y que el Firewall de Windows no bloquee el puerto {DEFAULT_PORT}.
-              </Text>
+              <Text style={styles.errorText}>{healthError}</Text>
             </View>
-          ) : (
-            <Text style={styles.statusSubtitle}>Esperando prueba de conexión...</Text>
+          )}
+
+          <TouchableOpacity
+            style={styles.refreshHealthBtn}
+            onPress={() => testHealth()}
+            disabled={isLoadingHealth}
+          >
+            <Text style={styles.refreshHealthText}>
+              {isLoadingHealth ? 'Verificando...' : '↻ Reintentar GET /health'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* POST /chat Test Card */}
+        <View style={styles.cardChat}>
+          <Text style={styles.sectionTitle}>Prueba de Endpoint: POST /chat</Text>
+          <Text style={styles.inputLabel}>Mensaje a enviar:</Text>
+          
+          <View style={styles.chatInputRow}>
+            <TextInput
+              style={styles.chatTextInput}
+              value={chatInput}
+              onChangeText={setChatInput}
+              placeholder='Ej: "Hola"'
+              placeholderTextColor="#64748b"
+            />
+            <TouchableOpacity
+              style={[styles.sendChatBtn, isSendingChat && styles.buttonDisabled]}
+              onPress={testChat}
+              disabled={isSendingChat}
+            >
+              {isSendingChat ? (
+                <ActivityIndicator color="#ffffff" size="small" />
+              ) : (
+                <Text style={styles.sendChatBtnText}>Enviar</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {chatResponse && (
+            <View style={styles.responseContainer}>
+              <Text style={styles.responseLabel}>Respuesta del Servidor:</Text>
+              <View style={styles.responseBubble}>
+                <Text style={styles.responseText}>{chatResponse}</Text>
+              </View>
+            </View>
           )}
         </View>
 
-        {/* Configuration Section */}
+        {/* Server Config & IP Presets */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Configuración del Servidor</Text>
-          <Text style={styles.inputLabel}>URL del Backend (FastAPI):</Text>
+          <Text style={styles.sectionTitle}>Configuración de Conexión</Text>
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
@@ -152,23 +194,21 @@ export default function ConnectionDiagnosticScreen() {
               onChangeText={setBackendUrl}
               autoCapitalize="none"
               autoCorrect={false}
-              placeholder="http://192.168.1.xxx:8000"
+              placeholder="http://10.43.236.182:8000"
               placeholderTextColor="#64748b"
             />
           </View>
 
-          {/* Preset Buttons */}
-          <Text style={styles.presetLabel}>Accesos rápidos de IP:</Text>
           <View style={styles.presetsRow}>
             <TouchableOpacity
               style={styles.presetBtn}
               onPress={() => {
                 const url = `http://${DEFAULT_LAN_IP}:${DEFAULT_PORT}`;
                 setBackendUrl(url);
-                testConnection(url);
+                testHealth(url);
               }}
             >
-              <Text style={styles.presetBtnText}>Wi-Fi Local ({DEFAULT_LAN_IP})</Text>
+              <Text style={styles.presetBtnText}>IP LAN ({DEFAULT_LAN_IP})</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -176,28 +216,15 @@ export default function ConnectionDiagnosticScreen() {
               onPress={() => {
                 const url = `http://10.0.2.2:${DEFAULT_PORT}`;
                 setBackendUrl(url);
-                testConnection(url);
+                testHealth(url);
               }}
             >
-              <Text style={styles.presetBtnText}>Emulador Android (10.0.2.2)</Text>
+              <Text style={styles.presetBtnText}>Emulador (10.0.2.2)</Text>
             </TouchableOpacity>
           </View>
-
-          {/* Action Button */}
-          <TouchableOpacity
-            style={[styles.primaryButton, isLoading && styles.buttonDisabled]}
-            onPress={() => testConnection()}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#ffffff" />
-            ) : (
-              <Text style={styles.primaryButtonText}>Probar Conexión Ahora</Text>
-            )}
-          </TouchableOpacity>
         </View>
 
-        {/* Logs Console */}
+        {/* Live Logs */}
         <View style={styles.section}>
           <View style={styles.logHeaderRow}>
             <Text style={styles.sectionTitle}>Consola de Eventos</Text>
@@ -245,7 +272,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   header: {
-    marginBottom: 20,
+    marginBottom: 18,
   },
   headerSubtitle: {
     color: '#38bdf8',
@@ -256,18 +283,18 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: '#f8fafc',
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '800',
   },
   headerDescription: {
     color: '#94a3b8',
-    fontSize: 14,
+    fontSize: 13,
     marginTop: 4,
   },
   card: {
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 24,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
     borderWidth: 1,
   },
   cardNeutral: {
@@ -282,14 +309,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#2b1117',
     borderColor: '#e11d48',
   },
+  cardChat: {
+    backgroundColor: '#0f172a',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+  },
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   statusDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     marginRight: 10,
   },
   dotOnline: {
@@ -303,81 +338,104 @@ const styles = StyleSheet.create({
   },
   statusTitle: {
     color: '#f8fafc',
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '700',
     flex: 1,
   },
   latencyBadge: {
     backgroundColor: 'rgba(16, 185, 129, 0.2)',
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: '#10b981',
   },
   latencyText: {
     color: '#34d399',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  refreshHealthBtn: {
+    marginTop: 10,
+    paddingVertical: 6,
+    alignItems: 'center',
+  },
+  refreshHealthText: {
+    color: '#38bdf8',
     fontSize: 12,
     fontWeight: '600',
   },
-  statusSubtitle: {
-    color: '#94a3b8',
-    fontSize: 13,
-    marginTop: 8,
-  },
-  detailsContainer: {
-    marginTop: 14,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 3,
-  },
-  detailLabel: {
-    color: '#94a3b8',
-    fontSize: 13,
-  },
-  detailValue: {
-    color: '#f1f5f9',
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  detailValueHighlight: {
-    color: '#38bdf8',
-    fontSize: 13,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
   errorBox: {
-    marginTop: 12,
+    marginTop: 8,
   },
   errorText: {
     color: '#fb7185',
-    fontSize: 13,
-    fontWeight: '600',
-    marginBottom: 6,
-  },
-  errorHelp: {
-    color: '#cbd5e1',
     fontSize: 12,
-    lineHeight: 18,
-  },
-  section: {
-    marginBottom: 24,
   },
   sectionTitle: {
     color: '#f8fafc',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   inputLabel: {
     color: '#94a3b8',
-    fontSize: 13,
+    fontSize: 12,
     marginBottom: 6,
+  },
+  chatInputRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  chatTextInput: {
+    flex: 1,
+    backgroundColor: '#1e293b',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#334155',
+    color: '#f8fafc',
+    paddingHorizontal: 12,
+    height: 42,
+    fontSize: 14,
+  },
+  sendChatBtn: {
+    backgroundColor: '#0284c7',
+    borderRadius: 10,
+    paddingHorizontal: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sendChatBtnText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  responseContainer: {
+    marginTop: 8,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#1e293b',
+  },
+  responseLabel: {
+    color: '#64748b',
+    fontSize: 11,
+    marginBottom: 6,
+  },
+  responseBubble: {
+    backgroundColor: '#1e293b',
+    borderRadius: 10,
+    padding: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#38bdf8',
+  },
+  responseText: {
+    color: '#e2e8f0',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  section: {
+    marginBottom: 20,
   },
   inputContainer: {
     backgroundColor: '#1e293b',
@@ -385,23 +443,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#334155',
     paddingHorizontal: 12,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   input: {
     color: '#f8fafc',
-    height: 44,
-    fontSize: 14,
-  },
-  presetLabel: {
-    color: '#94a3b8',
-    fontSize: 12,
-    marginBottom: 8,
+    height: 42,
+    fontSize: 13,
   },
   presetsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 16,
   },
   presetBtn: {
     backgroundColor: '#1e293b',
@@ -413,28 +464,11 @@ const styles = StyleSheet.create({
   },
   presetBtnText: {
     color: '#cbd5e1',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
-  },
-  primaryButton: {
-    backgroundColor: '#0284c7',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#0284c7',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
   },
   buttonDisabled: {
     opacity: 0.6,
-  },
-  primaryButtonText: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '700',
   },
   logHeaderRow: {
     flexDirection: 'row',
@@ -452,7 +486,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#1e293b',
     padding: 12,
-    minHeight: 120,
+    minHeight: 110,
   },
   consoleEmpty: {
     color: '#475569',
