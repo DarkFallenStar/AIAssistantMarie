@@ -11,10 +11,22 @@ class Settings(BaseSettings):
     # CORS: Allow all origins by default for mobile development and Tailscale
     CORS_ORIGINS: List[str] = ["*"]
     
-    # LLM Settings (Modular architecture: Ollama, OpenAI, Gemini, etc.)
-    LLM_PROVIDER: str = "ollama"  # "ollama", "gemini", "openai"
+    # LLM Settings
+    LLM_PROVIDER: str = "ollama"
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "llama3.2"
+    
+    # Google AI Studio (Fallback)
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-2.0-flash"
+    
+    # Supabase / PostgreSQL Database Settings
+    SUPABASE_URL: str = ""
+    SUPABASE_KEY: str = ""
+    DATABASE_URL: str = ""
+    
+    # Bank Webhook Security
+    BANK_WEBHOOK_SECRET: str = ""
     
     class Config:
         env_file = ".env"
