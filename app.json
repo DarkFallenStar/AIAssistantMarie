@@ -20,6 +20,15 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Permite a PersonalAssistantAI acceder a tu micrófono para comandos de voz.",
+          "recordAudioAndroid": true
+        }
+      ]
+    ]
   }
 }
