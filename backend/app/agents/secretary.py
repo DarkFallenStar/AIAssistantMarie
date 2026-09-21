@@ -136,7 +136,7 @@ class SecretaryAgent(BaseAgent):
                 tools_to_run.append(("task_tool", {"action": "complete", "task_id": tid, "title": tid}))
             elif any(kw in req_lower for kw in ["actualiza", "modifica", "cambia"]):
                 id_match = re.search(r'(?:tarea|id)\s+([a-zA-Z0-9_-]+)', request)
-                tid = id_match.group(1) if id_match else "t1-001"
+                tid = id_match.group(1) if id_match else request
                 priority = "urgent" if "urgente" in req_lower else ("high" if "alta" in req_lower else "medium")
                 tools_to_run.append(("task_tool", {"action": "update", "task_id": tid, "priority": priority}))
             elif any(kw in req_lower for kw in ["crear", "crea", "agrega", "anota", "nueva"]):

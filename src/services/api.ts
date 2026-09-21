@@ -7,6 +7,24 @@ export interface HealthResponse {
 
 export interface ChatResponse {
   response: string;
+  intent?: string;
+  agent?: string;
+  tools_executed?: string[];
+  structured_intent?: {
+    agent: string;
+    tool?: string | null;
+    arguments?: Record<string, any>;
+    reasoning?: string;
+  };
+}
+
+export interface DatabaseStatusResponse {
+  status: string;
+  connected: boolean;
+  message?: string;
+  supabase_url?: string;
+  tables_defined?: string[];
+  latencyMs?: number;
 }
 
 export function normalizeUrl(url: string): string {
@@ -62,6 +80,50 @@ export async function checkBackendHealth(
 }
 
 /**
+ * Checks connectivity with Supabase / database endpoint (GET /db/status).
+ * Measures response round-trip latency.
+ */
+export async function checkDatabaseStatus(
+  baseUrl: string,
+  timeoutMs: number = 8000
+): Promise<DatabaseStatusResponse> {
+  const url = `${normalizeUrl(baseUrl)}/db/status`;
+  const startTime = Date.now();
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+      },
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+    const latencyMs = Date.now() - startTime;
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data: DatabaseStatusResponse = await response.json();
+    return {
+      ...data,
+      latencyMs,
+    };
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === "AbortError") {
+      throw new Error(`Tiempo de espera agotado (${timeoutMs}ms) consultando estado de base de datos.`);
+    }
+    throw new Error(err.message || "No se pudo consultar el estado de la base de datos");
+  }
+}
+
+/**
  * Sends a chat message to POST /chat and returns the response string.
  */
 export async function sendChatMessage(
@@ -88,7 +150,14 @@ export async function sendChatMessage(
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      let errorMsg = `HTTP ${response.status}: ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        if (errorData?.detail) {
+          errorMsg = typeof errorData.detail === 'string' ? errorData.detail : JSON.stringify(errorData.detail);
+        }
+      } catch (_) {}
+      throw new Error(errorMsg);
     }
 
     const data: ChatResponse = await response.json();

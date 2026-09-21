@@ -15,11 +15,11 @@ class GoogleAIService(BaseLLMService):
         self,
         api_key: Optional[str] = None,
         model: Optional[str] = None,
-        timeout_seconds: float = 12.0,
+        timeout_seconds: Optional[float] = None,
     ):
         self._api_key = api_key if api_key is not None else settings.GEMINI_API_KEY
-        self._model = (model or settings.GEMINI_MODEL or "gemini-3.6-flash").strip()
-        self._timeout = timeout_seconds
+        self._model = (model or settings.GEMINI_MODEL or "gemini-3.8-flash").strip()
+        self._timeout = timeout_seconds if timeout_seconds is not None else getattr(settings, "GEMINI_TIMEOUT_SECONDS", 25.0)
 
     @property
     def provider_name(self) -> str:

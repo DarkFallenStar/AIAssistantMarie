@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from app.tools.base import BaseTool, ToolResult
-from app.core.database import get_supabase_client
+from app.core.database import get_supabase_client, is_valid_uuid, DEFAULT_USER_ID
 
 class TaskTools(BaseTool):
     """
@@ -64,9 +64,11 @@ class TaskTools(BaseTool):
                 message="El título de la tarea no puede estar vacío."
             )
 
-        task_id = f"t-{uuid.uuid4().hex[:8]}"
+        task_id = str(uuid.uuid4())
+        eff_user_id = user_id or DEFAULT_USER_ID
         payload = {
             "id": task_id,
+            "user_id": eff_user_id,
             "title": clean_title,
             "description": description or "",
             "status": "pending",
@@ -82,10 +84,7 @@ class TaskTools(BaseTool):
         client = get_supabase_client()
         if client:
             try:
-                db_payload = dict(payload)
-                db_payload["id"] = str(uuid.uuid4())
-                db_payload["user_id"] = user_id or "a0000000-0000-0000-0000-000000000001"
-                client.table("tasks").insert(db_payload).execute()
+                client.table("tasks").insert(payload).execute()
             except Exception as exc:
                 print(f"[TOOL] Supabase create_task failed ({exc}), storing in mock repository")
 
@@ -172,7 +171,7 @@ class TaskTools(BaseTool):
             )
 
         client = get_supabase_client()
-        if client:
+        if client and is_valid_uuid(task_id):
             try:
                 query = client.table("tasks").update(updates).eq("id", task_id)
                 if user_id:

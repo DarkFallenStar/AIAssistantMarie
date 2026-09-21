@@ -214,5 +214,49 @@ class TestLLMServiceLayer(unittest.TestCase):
         self.assertEqual(data["response"], "Hola! Soy tu asistente impulsado por LLM.")
         self.assertEqual(data["agent"], "GeneralOrchestrator")
 
+    # -------------------------------------------------------------
+    # 7. FailoverLLMService (Dual Provider Bidirectional Failover)
+    # -------------------------------------------------------------
+    def test_failover_service_primary_success(self):
+        from app.services.llm.failover import FailoverLLMService
+        primary = MockLLMService(canned_response="Primary response")
+        secondary = MockLLMService(canned_response="Secondary response")
+        failover = FailoverLLMService(primary_service=primary, secondary_service=secondary)
+
+        resp = asyncio.run(failover.generate("Hola"))
+        self.assertEqual(resp.text, "Primary response")
+        self.assertEqual(len(primary.history), 1)
+        self.assertEqual(len(secondary.history), 0)
+
+    def test_failover_service_primary_fails_secondary_succeeds(self):
+        from app.services.llm.failover import FailoverLLMService
+        # Primary fails with ConnectionError
+        failing_primary = OllamaService(base_url="http://127.0.0.1:9999")
+        secondary = MockLLMService(canned_response="Respuesta exitosa desde secundario")
+        failover = FailoverLLMService(primary_service=failing_primary, secondary_service=secondary)
+
+        resp = asyncio.run(failover.generate("Pregunta importante"))
+        self.assertEqual(resp.text, "Respuesta exitosa desde secundario")
+        self.assertEqual(len(secondary.history), 1)
+
+    def test_failover_service_vice_versa_ollama_fails_google_succeeds(self):
+        from app.services.llm.failover import FailoverLLMService
+        primary = OllamaService(base_url="http://127.0.0.1:9999")
+        secondary = MockLLMService(canned_response="Respuesta desde Google Gemini")
+        failover = FailoverLLMService(primary_service=primary, secondary_service=secondary)
+
+        resp = asyncio.run(failover.chat([LLMMessage(role=LLMRole.USER, content="Test")]))
+        self.assertEqual(resp.text, "Respuesta desde Google Gemini")
+
+    def test_failover_service_both_fail_raises_service_error(self):
+        from app.services.llm.failover import FailoverLLMService
+        failing1 = OllamaService(base_url="http://127.0.0.1:9998")
+        failing2 = OllamaService(base_url="http://127.0.0.1:9999")
+        failover = FailoverLLMService(primary_service=failing1, secondary_service=failing2)
+
+        with self.assertRaises(LLMServiceError):
+            asyncio.run(failover.generate("Pregunta"))
+
+
 if __name__ == "__main__":
     unittest.main()

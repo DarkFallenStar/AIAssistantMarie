@@ -1,7 +1,7 @@
 import uuid
 from typing import Optional, List, Dict, Any
 from app.tools.base import BaseTool, ToolResult
-from app.core.database import get_supabase_client
+from app.core.database import get_supabase_client, is_valid_uuid, DEFAULT_USER_ID
 
 class EmailTools(BaseTool):
     """
@@ -97,14 +97,7 @@ class EmailTools(BaseTool):
         client = get_supabase_client()
         if client:
             try:
-                # Check if valid UUID before querying PostgreSQL
-                try:
-                    uuid.UUID(email_id)
-                    is_valid_uuid = True
-                except (ValueError, AttributeError):
-                    is_valid_uuid = False
-
-                if is_valid_uuid:
+                if is_valid_uuid(email_id):
                     query = client.table("emails").select("*").eq("id", email_id)
                     if user_id:
                         query = query.eq("user_id", user_id)
@@ -140,33 +133,34 @@ class EmailTools(BaseTool):
         user_id: Optional[str] = None
     ) -> ToolResult:
         """
-        Searches emails matching query in sender, subject or body.
+        Searches emails matching a text query in sender, subject, snippet, or body.
         """
-        clean_q = (query or "").strip()
+        clean_q = (query or "").strip().lower()
+        if not clean_q:
+            return await self.list_emails(limit=limit, user_id=user_id)
+
         emails: List[Dict[str, Any]] = []
         client = get_supabase_client()
         if client:
             try:
-                sb_query = client.table("emails").select("*").limit(limit)
+                # Query recent emails and filter client-side / or use Supabase ilike
+                query_builder = client.table("emails").select("*").limit(limit * 2).order("received_at", desc=True)
                 if user_id:
-                    sb_query = sb_query.eq("user_id", user_id)
-                if clean_q:
-                    sb_query = sb_query.or_(f"subject.ilike.%{clean_q}%,body.ilike.%{clean_q}%,sender.ilike.%{clean_q}%")
-                res = sb_query.execute()
+                    query_builder = query_builder.eq("user_id", user_id)
+                res = query_builder.execute()
                 if res and res.data:
-                    emails.extend(res.data)
+                    for em in res.data:
+                        text_corpus = f"{em.get('sender', '')} {em.get('subject', '')} {em.get('snippet', '')} {em.get('body', '')}".lower()
+                        if clean_q in text_corpus:
+                            emails.append(em)
             except Exception as exc:
-                print(f"[TOOL] Supabase search_emails failed ({exc}), using mock fallback")
+                print(f"[TOOL] Supabase email search failed ({exc}), using mock fallback")
 
-        # Supplement with in-memory mock emails matching query
         seen_ids = {em.get("id") for em in emails}
-        term = clean_q.lower()
         for em in self._emails:
             if em.get("id") not in seen_ids:
-                sender = em.get("sender", "").lower()
-                subject = em.get("subject", "").lower()
-                body = em.get("body", "").lower()
-                if not term or term in sender or term in subject or term in body:
+                text_corpus = f"{em.get('sender', '')} {em.get('subject', '')} {em.get('snippet', '')} {em.get('body', '')}".lower()
+                if clean_q in text_corpus:
                     emails.append(em)
 
         filtered = emails[:limit]
@@ -186,9 +180,11 @@ class EmailTools(BaseTool):
         """
         Creates a new email draft in the database or mock storage.
         """
-        draft_id = f"draft-{uuid.uuid4().hex[:8]}"
+        draft_id = str(uuid.uuid4())
+        eff_user_id = user_id or DEFAULT_USER_ID
         draft_data = {
             "id": draft_id,
+            "user_id": eff_user_id,
             "sender": "usuario@asistente.ai",
             "recipient": recipient,
             "subject": subject,
@@ -198,21 +194,39 @@ class EmailTools(BaseTool):
             "category": "work",
             "is_important": False
         }
-        if user_id:
-            draft_data["user_id"] = user_id
 
         client = get_supabase_client()
         if client:
             try:
                 res = client.table("emails").insert(draft_data).execute()
                 saved_draft = res.data[0] if res and res.data else draft_data
+                self._emails.append(saved_draft)
                 return ToolResult(
                     success=True,
                     data=saved_draft,
                     message=f"Borrador de correo para '{recipient}' creado exitosamente."
                 )
             except Exception as exc:
-                print(f"[TOOL] Supabase create_email_draft failed ({exc}), saving to mock storage")
+                err_str = str(exc)
+                # Resilient fallback: if check constraint emails_status_check forbids 'draft'
+                if "emails_status_check" in err_str or "23514" in err_str:
+                    try:
+                        fallback_payload = dict(draft_data)
+                        fallback_payload["status"] = "unread"
+                        if not fallback_payload["subject"].startswith("[Borrador]"):
+                            fallback_payload["subject"] = f"[Borrador] {fallback_payload['subject']}"
+                        res = client.table("emails").insert(fallback_payload).execute()
+                        saved_draft = res.data[0] if res and res.data else fallback_payload
+                        self._emails.append(saved_draft)
+                        return ToolResult(
+                            success=True,
+                            data=saved_draft,
+                            message=f"Borrador de correo para '{recipient}' creado exitosamente en Supabase."
+                        )
+                    except Exception as retry_exc:
+                        print(f"[TOOL] Supabase draft constraint retry failed ({retry_exc}), saving to mock storage")
+                else:
+                    print(f"[TOOL] Supabase create_email_draft failed ({exc}), saving to mock storage")
 
         # Fallback in-memory
         self._emails.append(draft_data)

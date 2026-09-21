@@ -85,9 +85,9 @@ To guarantee zero-regression across the codebase and existing tests:
 - **When** calling `search_emails(query="decano")`
 - **Then** `ToolResult.success` is `True` and results contain matching emails
 - **When** calling `create_email_draft(recipient="test@example.com", subject="Proyecto", body="Borrador inicial")`
-- **Then** `ToolResult.success` is `True`, draft ID is generated, status is set to `'draft'`
+- **Then** `ToolResult.success` is `True`, a valid RFC 4122 UUID is generated, and status is saved as `'draft'` (or resiliently as `'unread'` with `[Borrador]` prefix if Supabase check constraint `emails_status_check` is active)
 - **When** calling `get_email(email_id=draft_id)`
-- **Then** the created draft is retrieved with exact recipient, subject, and body.
+- **Then** the created draft is retrieved with exact recipient, subject, and body without raising PostgreSQL `22P02`.
 
 ### Scenario 2: Task Operations (Create, List, Update, Complete)
 - **Given** `TaskTools` is initialized

@@ -1,9 +1,22 @@
+import uuid
 from typing import Optional, Dict, Any
 from supabase import create_client, Client
 from app.core.config import settings
 
 # Global cached client
 _supabase_client: Optional[Client] = None
+
+DEFAULT_USER_ID = "a0000000-0000-0000-0000-000000000001"
+
+def is_valid_uuid(val: Any) -> bool:
+    """Checks whether a value is a valid standard UUID string or UUID object."""
+    if not val:
+        return False
+    try:
+        uuid.UUID(str(val))
+        return True
+    except (ValueError, AttributeError, TypeError):
+        return False
 
 REQUIRED_SCHEMA_TABLES = [
     "users",

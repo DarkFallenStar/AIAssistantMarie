@@ -11,7 +11,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DEFAULT_BACKEND_URL, DEFAULT_LAN_IP, DEFAULT_PORT } from '../config';
-import { checkBackendHealth, sendChatMessage, HealthResponse, normalizeUrl } from '../services/api';
+import {
+  checkBackendHealth,
+  checkDatabaseStatus,
+  sendChatMessage,
+  HealthResponse,
+  DatabaseStatusResponse,
+  normalizeUrl,
+} from '../services/api';
 
 interface LogEntry {
   id: string;
@@ -40,6 +47,11 @@ export default function ConnectionDiagnosticScreen({
   const [isLoadingHealth, setIsLoadingHealth] = useState<boolean>(false);
   const [healthData, setHealthData] = useState<HealthResponse | null>(null);
   const [healthError, setHealthError] = useState<string | null>(null);
+
+  // Database Test State (Fase 3)
+  const [isLoadingDb, setIsLoadingDb] = useState<boolean>(false);
+  const [dbData, setDbData] = useState<DatabaseStatusResponse | null>(null);
+  const [dbError, setDbError] = useState<string | null>(null);
 
   // Chat Test State (Fase 2)
   const [chatInput, setChatInput] = useState<string>('Hola');
@@ -75,6 +87,29 @@ export default function ConnectionDiagnosticScreen({
     }
   };
 
+  const testDatabase = async (targetUrl?: string) => {
+    const urlToTest = normalizeUrl(targetUrl || backendUrl);
+    setIsLoadingDb(true);
+    setDbError(null);
+    addLog('info', `GET ${urlToTest}/db/status ...`);
+
+    try {
+      const data = await checkDatabaseStatus(urlToTest);
+      setDbData(data);
+      if (data.connected) {
+        addLog('success', `Supabase Conectado (${data.latencyMs}ms): ${data.tables_defined?.length || 0} tablas`);
+      } else {
+        addLog('error', `Supabase No Conectado: ${data.message || 'error'}`);
+      }
+    } catch (err: any) {
+      setDbData(null);
+      setDbError(err.message);
+      addLog('error', `DB Error: ${err.message}`);
+    } finally {
+      setIsLoadingDb(false);
+    }
+  };
+
   const testChat = async () => {
     if (!chatInput.trim()) return;
     const urlToTest = normalizeUrl(backendUrl);
@@ -94,6 +129,7 @@ export default function ConnectionDiagnosticScreen({
 
   useEffect(() => {
     testHealth();
+    testDatabase();
   }, []);
 
   return (
@@ -175,6 +211,59 @@ export default function ConnectionDiagnosticScreen({
           </TouchableOpacity>
         </View>
 
+        {/* Database Status Card (Supabase) */}
+        <View
+          style={[
+            styles.card,
+            dbData?.connected
+              ? styles.cardSuccess
+              : dbError || (dbData && !dbData.connected)
+              ? styles.cardError
+              : styles.cardNeutral,
+          ]}
+        >
+          <View style={styles.statusRow}>
+            <View
+              style={[
+                styles.statusDot,
+                dbData?.connected
+                  ? styles.dotOnline
+                  : isLoadingDb
+                  ? styles.dotPending
+                  : styles.dotOffline,
+              ]}
+            />
+            <Text style={styles.statusTitle}>
+              {isLoadingDb
+                ? 'Comprobando GET /db/status...'
+                : dbData?.connected
+                ? `Supabase Conectado (${dbData.tables_defined?.length || 0} tablas)`
+                : 'Base de Datos Desconectada'}
+            </Text>
+            {dbData?.latencyMs !== undefined && (
+              <View style={styles.latencyBadge}>
+                <Text style={styles.latencyText}>{dbData.latencyMs} ms</Text>
+              </View>
+            )}
+          </View>
+
+          {dbError && (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{dbError}</Text>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={styles.refreshHealthBtn}
+            onPress={() => testDatabase()}
+            disabled={isLoadingDb}
+          >
+            <Text style={styles.refreshHealthText}>
+              {isLoadingDb ? 'Verificando...' : '↻ Probar GET /db/status'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* POST /chat Test Card */}
         <View style={styles.cardChat}>
           <Text style={styles.sectionTitle}>Prueba de Endpoint: POST /chat</Text>
@@ -233,6 +322,7 @@ export default function ConnectionDiagnosticScreen({
                 const url = `http://${DEFAULT_LAN_IP}:${DEFAULT_PORT}`;
                 setBackendUrl(url);
                 testHealth(url);
+                testDatabase(url);
               }}
             >
               <Text style={styles.presetBtnText}>IP LAN ({DEFAULT_LAN_IP})</Text>
@@ -244,6 +334,7 @@ export default function ConnectionDiagnosticScreen({
                 const url = `http://10.0.2.2:${DEFAULT_PORT}`;
                 setBackendUrl(url);
                 testHealth(url);
+                testDatabase(url);
               }}
             >
               <Text style={styles.presetBtnText}>Emulador (10.0.2.2)</Text>
@@ -462,7 +553,6 @@ const styles = StyleSheet.create({
   responseLabel: {
     color: '#64748b',
     fontSize: 11,
-    marginBottom: 6,
   },
   responseBubble: {
     backgroundColor: '#1e293b',

@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from app.tools.base import BaseTool, ToolResult
-from app.core.database import get_supabase_client
+from app.core.database import get_supabase_client, is_valid_uuid, DEFAULT_USER_ID
 
 class ReminderTools(BaseTool):
     """
@@ -61,9 +61,11 @@ class ReminderTools(BaseTool):
                 message="El título del recordatorio no puede estar vacío."
             )
 
-        reminder_id = f"rem-{uuid.uuid4().hex[:8]}"
+        reminder_id = str(uuid.uuid4())
+        eff_user_id = user_id or DEFAULT_USER_ID
         payload = {
             "id": reminder_id,
+            "user_id": eff_user_id,
             "title": clean_title,
             "description": description or "",
             "remind_at": remind_at,
@@ -73,8 +75,6 @@ class ReminderTools(BaseTool):
             "category": "reminder",
             "created_at": datetime.now(timezone.utc).isoformat()
         }
-        if user_id:
-            payload["user_id"] = user_id
 
         # Keep in-memory copy up to date
         self._reminders.append(payload)
@@ -84,8 +84,8 @@ class ReminderTools(BaseTool):
             try:
                 # Map to tasks table with category='reminder'
                 db_payload = {
-                    "id": str(uuid.uuid4()),
-                    "user_id": user_id or "a0000000-0000-0000-0000-000000000001",
+                    "id": reminder_id,
+                    "user_id": eff_user_id,
                     "title": clean_title,
                     "description": description or "",
                     "due_date": None,
@@ -140,11 +140,7 @@ class ReminderTools(BaseTool):
         seen_ids = {r.get("id") for r in reminders}
         for r in self._reminders:
             if r.get("id") not in seen_ids:
-                if status == "all" or not status:
-                    reminders.append(r)
-                elif status == "active" and r.get("status") == "active":
-                    reminders.append(r)
-                elif status == "completed" and r.get("status") == "completed":
+                if status == "all" or r.get("status") == status:
                     reminders.append(r)
 
         filtered = reminders[:limit]
@@ -163,7 +159,7 @@ class ReminderTools(BaseTool):
         Marks an active reminder as completed/dismissed.
         """
         client = get_supabase_client()
-        if client:
+        if client and is_valid_uuid(reminder_id):
             try:
                 query = client.table("tasks").update({
                     "status": "completed",
@@ -207,7 +203,7 @@ class ReminderTools(BaseTool):
         Permanently deletes or cancels a reminder.
         """
         client = get_supabase_client()
-        if client:
+        if client and is_valid_uuid(reminder_id):
             try:
                 query = client.table("tasks").delete().eq("id", reminder_id).eq("category", "reminder")
                 if user_id:

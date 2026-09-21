@@ -13,13 +13,15 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = ["*"]
     
     # LLM Settings
-    LLM_PROVIDER: str = "ollama"
+    LLM_PROVIDER: str = "dual"
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "llama3.2"
+    OLLAMA_TIMEOUT_SECONDS: float = 25.0
     
-    # Google AI Studio (Fallback)
+    # Google AI Studio (Gemini)
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-3.6-flash"
+    GEMINI_MODEL: str = "gemini-3.5-flash-lite"
+    GEMINI_TIMEOUT_SECONDS: float = 25.0
     
     # Supabase / PostgreSQL Database Settings
     SUPABASE_URL: str = ""

@@ -13,11 +13,11 @@ class OllamaService(BaseLLMService):
         self,
         base_url: Optional[str] = None,
         model: Optional[str] = None,
-        timeout_seconds: float = 10.0,
+        timeout_seconds: Optional[float] = None,
     ):
         self._base_url = (base_url or settings.OLLAMA_BASE_URL).rstrip("/")
         self._model = model or settings.OLLAMA_MODEL
-        self._timeout = timeout_seconds
+        self._timeout = timeout_seconds if timeout_seconds is not None else getattr(settings, "OLLAMA_TIMEOUT_SECONDS", 25.0)
 
     @property
     def provider_name(self) -> str:
