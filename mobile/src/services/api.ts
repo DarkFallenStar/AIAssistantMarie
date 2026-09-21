@@ -59,6 +59,8 @@ export interface WebhookRecentTransaction {
   merchant?: string;
   category: string;
   type: string;
+  description?: string;
+  source?: string;
   transaction_date?: string;
   metadata?: Record<string, any>;
 }
@@ -378,6 +380,7 @@ export async function sendBankWebhook(
   }
 }
 
+
 /**
   * Fetches recent transactions captured by the bank webhook (GET /webhooks/bank/recent).
   */
@@ -418,3 +421,242 @@ export async function getRecentWebhookTransactions(
     throw new Error(err.message || 'Error al obtener transacciones del webhook');
   }
 }
+
+// -----------------------------------------------------------------------------
+// Database Generic CRUD Client Methods
+// -----------------------------------------------------------------------------
+
+export interface DatabaseSummaryResponse {
+  status: string;
+  counts: Record<string, number>;
+  timestamp: string;
+}
+
+export interface DatabaseTableResponse<T = any> {
+  status: string;
+  table: string;
+  count: number;
+  data: T[];
+}
+
+export interface DatabaseRecordMutationResponse<T = any> {
+  status: string;
+  table: string;
+  id?: string;
+  data?: T;
+  success?: boolean;
+}
+
+/**
+ * Fetches record count summary across all tables (GET /db/summary).
+ */
+export async function fetchDatabaseSummary(
+  baseUrl: string,
+  timeoutMs: number = 10000
+): Promise<DatabaseSummaryResponse> {
+  const url = `${normalizeUrl(baseUrl)}/db/summary`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: getAuthHeaders({ Accept: 'application/json' }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try {
+        const d = await res.json();
+        if (d?.detail) detail = d.detail;
+      } catch (_) {}
+      throw new Error(detail);
+    }
+
+    return await res.json();
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error(`Tiempo de espera agotado (${timeoutMs}ms) al consultar resumen de DB.`);
+    }
+    throw new Error(err.message || 'Error al consultar resumen de base de datos');
+  }
+}
+
+/**
+ * Fetches records from a specific table with optional filters (GET /db/table/{tableName}).
+ */
+export async function fetchTableRecords<T = any>(
+  baseUrl: string,
+  tableName: string,
+  params?: { category?: string; status?: string; limit?: number },
+  timeoutMs: number = 12000
+): Promise<DatabaseTableResponse<T>> {
+  const queryParts: string[] = [];
+  if (params?.category) queryParts.push(`category=${encodeURIComponent(params.category)}`);
+  if (params?.status) queryParts.push(`status=${encodeURIComponent(params.status)}`);
+  if (params?.limit) queryParts.push(`limit=${params.limit}`);
+
+  const queryString = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+  const url = `${normalizeUrl(baseUrl)}/db/table/${encodeURIComponent(tableName)}${queryString}`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: getAuthHeaders({ Accept: 'application/json' }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try {
+        const d = await res.json();
+        if (d?.detail) detail = d.detail;
+      } catch (_) {}
+      throw new Error(detail);
+    }
+
+    return await res.json();
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error(`Tiempo de espera agotado (${timeoutMs}ms) al listar tabla ${tableName}.`);
+    }
+    throw new Error(err.message || `Error al obtener datos de ${tableName}`);
+  }
+}
+
+/**
+ * Creates a new record in the specified database table (POST /db/table/{tableName}).
+ */
+export async function createTableRecord<T = any>(
+  baseUrl: string,
+  tableName: string,
+  record: Record<string, any>,
+  timeoutMs: number = 12000
+): Promise<DatabaseRecordMutationResponse<T>> {
+  const url = `${normalizeUrl(baseUrl)}/db/table/${encodeURIComponent(tableName)}`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: getAuthHeaders({
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      }),
+      body: JSON.stringify(record),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try {
+        const d = await res.json();
+        if (d?.detail) detail = d.detail;
+      } catch (_) {}
+      throw new Error(detail);
+    }
+
+    return await res.json();
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error(`Tiempo de espera agotado (${timeoutMs}ms) al crear registro en ${tableName}.`);
+    }
+    throw new Error(err.message || `Error al crear registro en ${tableName}`);
+  }
+}
+
+/**
+ * Updates a record in the specified table by ID (PATCH /db/table/{tableName}/{recordId}).
+ */
+export async function updateTableRecord<T = any>(
+  baseUrl: string,
+  tableName: string,
+  recordId: string,
+  updates: Record<string, any>,
+  timeoutMs: number = 12000
+): Promise<DatabaseRecordMutationResponse<T>> {
+  const url = `${normalizeUrl(baseUrl)}/db/table/${encodeURIComponent(tableName)}/${encodeURIComponent(recordId)}`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers: getAuthHeaders({
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      }),
+      body: JSON.stringify(updates),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try {
+        const d = await res.json();
+        if (d?.detail) detail = d.detail;
+      } catch (_) {}
+      throw new Error(detail);
+    }
+
+    return await res.json();
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error(`Tiempo de espera agotado (${timeoutMs}ms) al actualizar registro en ${tableName}.`);
+    }
+    throw new Error(err.message || `Error al actualizar registro en ${tableName}`);
+  }
+}
+
+/**
+ * Deletes a record from the specified table by ID (DELETE /db/table/{tableName}/{recordId}).
+ */
+export async function deleteTableRecord(
+  baseUrl: string,
+  tableName: string,
+  recordId: string,
+  timeoutMs: number = 10000
+): Promise<{ status: string; table: string; id: string; success: boolean }> {
+  const url = `${normalizeUrl(baseUrl)}/db/table/${encodeURIComponent(tableName)}/${encodeURIComponent(recordId)}`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      method: 'DELETE',
+      headers: getAuthHeaders({ Accept: 'application/json' }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try {
+        const d = await res.json();
+        if (d?.detail) detail = d.detail;
+      } catch (_) {}
+      throw new Error(detail);
+    }
+
+    return await res.json();
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error(`Tiempo de espera agotado (${timeoutMs}ms) al eliminar registro de ${tableName}.`);
+    }
+    throw new Error(err.message || `Error al eliminar registro de ${tableName}`);
+  }
+}
+

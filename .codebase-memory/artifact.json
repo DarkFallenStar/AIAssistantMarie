@@ -1,11 +1,11 @@
 {
     "schema_version": 2,
-    "commit": "c1e469a466cc107c06c3c0e337136547beb9845e",
-    "indexed_at": "2026-09-21T20:18:30Z",
-    "project": "C-Users-kenny-OneDrive-Documents-Cosas-de-movil-que-lo-buguie-todo-PersonalAssistantAI-PersonalAssistantAI",
-    "nodes": 1359,
-    "edges": 5124,
-    "original_size": 6881280,
-    "compressed_size": 978316,
+    "commit": "0584af8349481bf268de03c104fac6eb08269bdb",
+    "indexed_at": "2026-09-21T20:49:05Z",
+    "project": "PersonalAssistantAI",
+    "nodes": 1458,
+    "edges": 5560,
+    "original_size": 5701632,
+    "compressed_size": 988434,
     "compression_level": 9
 }

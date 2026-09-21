@@ -27,11 +27,13 @@ import { ChatMessage } from '../components/MessageBubble';
 import MicButton from '../components/MicButton';
 import { DEFAULT_BACKEND_URL } from '../config';
 import { sendChatMessage, sendAudioRecording } from '../services/api';
+import { loadChatHistory, saveChatHistory, clearChatHistory } from '../services/chatStorage';
 
 interface AssistantScreenProps {
   backendUrl?: string;
   onOpenDiagnostics?: () => void;
   onOpenAutomation?: () => void;
+  onOpenDatabase?: () => void;
 }
 
 /**
@@ -55,6 +57,7 @@ export default function AssistantScreen({
   backendUrl = DEFAULT_BACKEND_URL,
   onOpenDiagnostics,
   onOpenAutomation,
+  onOpenDatabase,
 }: AssistantScreenProps) {
   const [state, setState] = useState<AssistantState>('IDLE');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -76,12 +79,47 @@ export default function AssistantScreen({
       } catch (err) {
         console.warn('Error configurando modo de audio inicial:', err);
       }
+
+      // Cargar historial de conversación persistido localmente
+      try {
+        const savedMessages = await loadChatHistory();
+        if (savedMessages && savedMessages.length > 0) {
+          setMessages(savedMessages);
+        }
+      } catch (err) {
+        console.warn('Error cargando historial de chat:', err);
+      }
     })();
 
     return () => {
       Speech.stop();
     };
   }, []);
+
+  // Guardar historial cada vez que se agreguen o actualicen mensajes
+  useEffect(() => {
+    if (messages.length > 0) {
+      saveChatHistory(messages);
+    }
+  }, [messages]);
+
+  const handleClearChat = () => {
+    Alert.alert(
+      'Limpiar conversación',
+      '¿Deseas borrar todo el historial del chat en la pantalla?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Borrar',
+          style: 'destructive',
+          onPress: async () => {
+            setMessages([]);
+            await clearChatHistory();
+          },
+        },
+      ]
+    );
+  };
 
   const getFormattedTime = () => {
     return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -316,6 +354,16 @@ export default function AssistantScreen({
               <Text style={styles.ttsToggleText}>{isTTSActive ? '🔊 Voz' : '🔇 Mute'}</Text>
             </TouchableOpacity>
 
+            {onOpenDatabase && (
+              <TouchableOpacity
+                style={[styles.diagButton, styles.databaseBtn]}
+                onPress={onOpenDatabase}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.databaseBtnText}>📊 Datos</Text>
+              </TouchableOpacity>
+            )}
+
             {onOpenDiagnostics && (
               <TouchableOpacity
                 style={styles.diagButton}
@@ -335,6 +383,15 @@ export default function AssistantScreen({
                 <Text style={styles.diagButtonText}>🏦 Banco</Text>
               </TouchableOpacity>
             )}
+
+            <TouchableOpacity
+              style={styles.clearChatBtn}
+              onPress={handleClearChat}
+              activeOpacity={0.7}
+              accessibilityLabel="Limpiar historial de conversación"
+            >
+              <Text style={styles.clearChatBtnText}>🗑️</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -508,16 +565,36 @@ const styles = StyleSheet.create({
   },
   diagButton: {
     backgroundColor: '#1e293b',
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: '#334155',
   },
   diagButtonText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#e2e8f0',
     fontWeight: '600',
+  },
+  databaseBtn: {
+    backgroundColor: '#312e81',
+    borderColor: '#4f46e5',
+  },
+  databaseBtnText: {
+    fontSize: 11,
+    color: '#c7d2fe',
+    fontWeight: '700',
+  },
+  clearChatBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  clearChatBtnText: {
+    fontSize: 12,
   },
   stateBar: {
     paddingVertical: 10,

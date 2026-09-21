@@ -244,3 +244,21 @@ SECRETARY AGENT       FINANCIAL AGENT           OTHER AGENTS...
 3. **Restart Persistence Validation**:
    - `backend/tests/test_database_persistence.py` verifies end-to-end that created tasks and transactions survive simulated process restarts, update state, and are cleanly purged upon deletion. Total automated baseline: 191 tests passing (181 backend + 10 mobile).
 
+### P. Chat Persistence & Unified Tabbed Database Manager (Manual CRUD)
+1. **Local Chat File Storage via Modern Expo SDK 57 API**:
+   - In Expo SDK 57, chat persistence is handled cleanly via `expo-file-system` `new File(Paths.document, 'assistant_chat_history.json')`.
+   - `loadChatHistory()` loads the message array upon component mount, ensuring conversation history is preserved across Expo Go reloads (`r`) and app restarts.
+   - `saveChatHistory()` serializes messages dynamically upon state changes.
+   - A dedicated clear button (`🗑️`) with confirmation allows clearing chat history when desired.
+2. **Unified Database Manager Screen (`DatabaseManagerScreen.tsx`)**:
+   - A single cohesive screen acts as a multi-tab database explorer for all tables the app interacts with (`tasks`, `reminders`, `transactions`, `financial_accounts`, `emails`, `saving_goals`).
+   - Displays live counters per tab via `GET /db/summary`.
+   - Features manual CRUD modals tailored to the active tab:
+     - Tareas/Recordatorios: Title, description, due date, priority selector, quick checkbox toggle (`PATCH`), and deletion (`DELETE`).
+     - Transacciones: Type (`expense`/`income`), COP currency input, category, description, merchant, and deletion (`DELETE`).
+     - Cuentas & Metas: Name, institution, target amount, current amount, visual percentage progress bar.
+3. **Parity & Verification Baseline**:
+   - 100% synchronization maintained between `src/` and `mobile/src/`.
+   - 202 automated tests passing (186 backend + 16 mobile).
+
+
