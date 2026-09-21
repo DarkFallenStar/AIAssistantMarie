@@ -42,6 +42,7 @@ class LoanTools(BaseTool):
         Retrieves active loans and financing details from the database.
         """
         loans: List[Dict[str, Any]] = []
+        db_success = False
         client = get_supabase_client()
         if client:
             try:
@@ -49,7 +50,7 @@ class LoanTools(BaseTool):
                 if user_id:
                     query = query.eq("user_id", user_id)
                 res = query.execute()
-                if res and res.data:
+                if res and res.data is not None:
                     for l in res.data:
                         loans.append({
                             "id": l.get("id"),
@@ -63,10 +64,12 @@ class LoanTools(BaseTool):
                             "start_date": l.get("start_date"),
                             "status": l.get("status", "active")
                         })
+                db_success = True
             except Exception as exc:
                 print(f"[TOOL] Supabase get_loans failed ({exc}), using mock fallback")
+                db_success = False
 
-        if not loans:
+        if not db_success:
             loans = [dict(l) for l in self._loans]
 
         total_debt = sum(l["remaining_balance"] for l in loans)

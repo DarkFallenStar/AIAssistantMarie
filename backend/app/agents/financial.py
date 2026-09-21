@@ -100,10 +100,44 @@ class FinancialAgent(BaseAgent):
                 tools_to_run.append(("saving_goal_tool", {"action": "list"}))
 
         # -----------------------------------------------------------------
-        # 4. TRANSACTIONS INTENT (Create / Categorize / List)
+        # 4. TRANSACTIONS INTENT (List / Categorize / Create)
         # -----------------------------------------------------------------
-        # A. Create transaction
-        if any(kw in req_lower for kw in ["registra un gasto", "agrega un gasto", "anota un gasto", "nuevo gasto", "compre", "compré", "gaste", "gasté", "registra una transaccion", "registra una transacción"]):
+        # A. Query Transactions (Checked FIRST to avoid accidental expense creation on questions)
+        is_tx_query = any(kw in req_lower for kw in [
+            "movimientos", "transacciones", "ultimos gastos", "últimos gastos",
+            "historial", "en que gaste", "en qué gasté", "gastado en", "gasto en",
+            "gastos en", "que gaste", "qué gasté", "que he gastado", "qué he gastado",
+            "cuanto gaste", "cuánto gasté", "mis gastos", "lista de gastos",
+            "listar gastos", "ver gastos", "ver transacciones", "consultar gastos"
+        ])
+        if is_tx_query:
+            cat_filter = None
+            for cat in ["supermercado", "alimentos", "comida", "alimentacion", "alimentación", "transporte", "gasolina", "farmacia", "educacion", "educación", "ocio", "servicios"]:
+                if cat in req_lower:
+                    cat_filter = cat
+                    break
+            tools_to_run.append(("transaction_tool", {"action": "list", "category": cat_filter, "limit": 20}))
+
+        # B. Categorize transaction
+        elif any(kw in req_lower for kw in ["categoriza", "clasifica", "cambia la categoria", "cambia la categoría"]):
+            cat_match = re.search(r'(?:a|como)\s+([a-zA-ZáéíóúÁÉÍÓÚñÑ_ -]+)', request)
+            new_cat = cat_match.group(1).strip().lower() if cat_match else "general"
+            id_match = re.search(r'(?:transaccion|transacción|id)\s+([0-9a-fA-F-]+)', request)
+            tx_id = id_match.group(1) if id_match else "10000000-0000-0000-0000-000000000001"
+            tools_to_run.append(("transaction_tool", {
+                "action": "categorize",
+                "transaction_id": tx_id,
+                "category": new_cat
+            }))
+
+        # C. Create transaction (Strict: only on explicit imperative recording commands, NEVER on questions)
+        elif any(kw in req_lower for kw in [
+            "registra un gasto", "agrega un gasto", "anota un gasto", "nuevo gasto",
+            "registra una transaccion", "registra una transacción", "anota una compra", "registra compra"
+        ]) or (
+            any(kw in req_lower for kw in ["compre ", "compré ", "pague ", "pagué "])
+            and not any(q in req_lower for q in ["que", "qué", "cuanto", "cuánto", "donde", "dónde", "ver", "dime", "mostrar", "historial"])
+        ):
             amt_match = re.search(r'(?:\$|de\s+)?([0-9]+(?:[.,][0-9]{1,2})?)\s*(?:pesos|cop|dolares|dólares|usd|\$)?', request, re.IGNORECASE)
             amount = float(amt_match.group(1).replace(",", ".")) if amt_match else 20000.0
             currency = "USD" if any(w in req_lower for w in ["dolar", "dólar", "usd"]) else "COP"
@@ -128,25 +162,6 @@ class FinancialAgent(BaseAgent):
                 "description": f"Gasto registrado: {category}",
                 "merchant": category.capitalize()
             }))
-        # B. Categorize transaction
-        elif any(kw in req_lower for kw in ["categoriza", "clasifica", "cambia la categoria", "cambia la categoría"]):
-            cat_match = re.search(r'(?:a|como)\s+([a-zA-ZáéíóúÁÉÍÓÚñÑ_ -]+)', request)
-            new_cat = cat_match.group(1).strip().lower() if cat_match else "general"
-            id_match = re.search(r'(?:transaccion|transacción|id)\s+([0-9a-fA-F-]+)', request)
-            tx_id = id_match.group(1) if id_match else "10000000-0000-0000-0000-000000000001"
-            tools_to_run.append(("transaction_tool", {
-                "action": "categorize",
-                "transaction_id": tx_id,
-                "category": new_cat
-            }))
-        # C. Query Transactions
-        elif any(kw in req_lower for kw in ["movimientos", "transacciones", "ultimos gastos", "últimos gastos", "historial", "en que gaste", "en qué gasté", "gastado en", "gasto en", "gastos en"]):
-            cat_filter = None
-            for cat in ["supermercado", "alimentos", "comida", "alimentacion", "alimentación", "transporte", "gasolina", "farmacia", "educacion", "educación", "ocio", "servicios"]:
-                if cat in req_lower:
-                    cat_filter = cat
-                    break
-            tools_to_run.append(("transaction_tool", {"action": "list", "category": cat_filter, "limit": 5}))
 
         # -----------------------------------------------------------------
         # 5. CASH FLOW & BALANCE INTENT

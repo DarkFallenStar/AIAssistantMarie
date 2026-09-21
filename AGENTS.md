@@ -276,5 +276,15 @@ SECRETARY AGENT       FINANCIAL AGENT           OTHER AGENTS...
 4. **Permanent Parity Rule**:
    - Every UI component or screen updated in `src/` MUST be replicated identically in `mobile/src/` to prevent divergent behavior.
 
-
-
+### R. Zero-Mock Database Integrity & Query/Creation Disambiguation
+1. **Zero-Mock Policy on Active Database Connection**:
+   - When Supabase PostgreSQL is connected (`db_success = True`), query results must reflect the live database strictly. If a table has 0 records, tools return 0 records and an honest message (e.g. "No tienes préstamos registrados"), NEVER falling back to mock data or appending hardcoded mock lists.
+   - Mock data is strictly reserved as an offline fallback when the database network connection fails (`db_success = False`).
+2. **Intent Query vs. Creation Disambiguation**:
+   - Interrogative phrases ("¿En qué gasté?", "¿Cuáles son mis tareas?", "Dime mis recordatorios") must ALWAYS route to `list_*` tools, never `create_*`.
+   - Creation tools (`create_transaction`, `create_task`, `create_reminder`) are strictly reserved for imperative recording commands ("registra un gasto", "anota una tarea", "recuérdame pagar...") and must never trigger if question words (`qué`, `cuál`, `cuáles`, `cuánto`, `cuánta`, `cuántos`, `cuántas`) are present.
+   - Multi-agent compound intent heuristics (`OrchestratorService`) must verify whether an action is an inquiry before defaulting to creating tasks from user prompts.
+3. **Query Result Pagination & Truncation**:
+   - Default query limits in tool schemas and system prompts are maintained at 20 to 50 items (not 5 or 10), ensuring complete lists of user tasks and transactions are returned.
+4. **Test Suite Database Isolation**:
+   - Automated test suites running against live database credentials must include explicit tear-down cleanup routines (`tearDownClass`, `delete_task`, `delete_transaction`) so tests never pollute production tables with test artifacts.

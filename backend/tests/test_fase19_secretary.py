@@ -100,6 +100,7 @@ class TestFase19Secretary(unittest.TestCase):
         self.assertTrue(comp_res.success)
         self.assertEqual(comp_res.data["status"], "completed")
         self.assertIsNotNone(comp_res.data.get("completed_at"))
+        asyncio.run(self.task_tools.delete_task(task_id))
 
     def test_completar_tarea_inexistente(self):
         comp_res = asyncio.run(self.task_tools.complete_task(task_id="00000000-0000-0000-0000-000000000000"))

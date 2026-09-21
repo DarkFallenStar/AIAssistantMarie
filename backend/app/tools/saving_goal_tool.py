@@ -40,6 +40,7 @@ class SavingGoalTools(BaseTool):
         Retrieves saving goals from the database and computes progress percentages.
         """
         goals: List[Dict[str, Any]] = []
+        db_success = False
         client = get_supabase_client()
         if client:
             try:
@@ -49,7 +50,7 @@ class SavingGoalTools(BaseTool):
                 if status:
                     query = query.eq("status", status)
                 res = query.execute()
-                if res and res.data:
+                if res and res.data is not None:
                     for g in res.data:
                         target = float(g.get("target_amount", 0))
                         current = float(g.get("current_amount", 0))
@@ -64,10 +65,12 @@ class SavingGoalTools(BaseTool):
                             "deadline": g.get("deadline"),
                             "status": g.get("status", "in_progress")
                         })
+                db_success = True
             except Exception as exc:
                 print(f"[TOOL] Supabase get_saving_goals failed ({exc}), using mock fallback")
+                db_success = False
 
-        if not goals:
+        if not db_success:
             for g in self._goals:
                 if not status or g.get("status") == status:
                     target = float(g.get("target_amount", 0))

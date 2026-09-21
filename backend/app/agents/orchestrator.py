@@ -34,7 +34,7 @@ AGENTES DISPONIBLES:
    - Se utiliza para: Consultas y operaciones de finanzas personales.
    - Herramientas disponibles:
      * "calculate_cash_flow": Calcula saldo neto y flujo de caja del mes. Argumentos: {"period": "current_month"}
-     * "list_transactions": Consulta transacciones o movimientos recientes. Argumentos: {"category": null o string, "limit": 5}
+     * "list_transactions": Consulta transacciones o movimientos recientes. Argumentos: {"category": null o string, "limit": 20}
      * "create_transaction": Registra un nuevo gasto o ingreso. Argumentos: {"amount": float, "type": "expense" | "income", "category": str, "description": str, "merchant": str, "currency": "COP" | "USD"}
      * "categorize_transaction": Modifica la categoría de una transacción. Argumentos: {"transaction_id": str, "category": str}
      * "delete_transaction": Elimina una transacción por ID. Argumentos: {"transaction_id": str}
@@ -46,18 +46,18 @@ AGENTES DISPONIBLES:
 3. "secretary":
    - Se utiliza para: Gestión de agenda, tareas, recordatorios y correos electrónicos.
    - Herramientas disponibles:
-     * "list_tasks": Lista tareas pendientes. Argumentos: {"status": "pending" o null, "limit": 5}
+     * "list_tasks": Lista tareas pendientes. Argumentos: {"status": "pending" o null, "limit": 20}
      * "create_task": Crea una nueva tarea. Argumentos: {"title": str, "due_date": str o null, "priority": "low" | "medium" | "high"}
      * "complete_task": Marca una tarea como completada. Argumentos: {"task_id": str}
      * "delete_task": Elimina una tarea por ID o título. Argumentos: {"task_id": str}
-     * "list_reminders": Lista recordatorios. Argumentos: {"timeframe": "all" | "today" | "upcoming", "limit": 5}
+     * "list_reminders": Lista recordatorios. Argumentos: {"timeframe": "all" | "today" | "upcoming", "limit": 20}
      * "create_reminder": Programa un recordatorio. Argumentos: {"title": str, "remind_at": str, "channel": "app"}
-     * "list_unread_emails": Consulta correos no leídos pendientes. Argumentos: {"limit": 5}
-     * "list_emails": Consulta correos recibidos. Argumentos: {"status": "unread" o null, "limit": 5}
+     * "list_unread_emails": Consulta correos no leídos pendientes. Argumentos: {"limit": 20}
+     * "list_emails": Consulta correos recibidos. Argumentos: {"status": "unread" o null, "limit": 20}
      * "get_email": Lee un correo específico por ID. Argumentos: {"email_id": str}
      * "search_emails": Busca correos por remitente o asunto. Argumentos: {"search": str}
      * "summarize_email": Genera resumen ejecutivo de un correo específico o por búsqueda. Argumentos: {"query": str o null, "email_id": str o null}
-     * "prioritize_emails": Clasifica y ordena los correos por nivel de prioridad o urgencia. Argumentos: {"limit": 5}
+     * "prioritize_emails": Clasifica y ordena los correos por nivel de prioridad o urgencia. Argumentos: {"limit": 20}
      * "draft_email": Redacta un borrador de correo sin enviarlo. Argumentos: {"recipient": str, "subject": str, "body": str}
      * "send_email": Solicita enviar un correo (crea borrador y solicita confirmación previa). Argumentos: {"recipient": str, "subject": str, "body": str, "confirmed": false}
 
@@ -372,15 +372,28 @@ class OrchestratorService:
                 # Heuristic decomposition if no explicit sub-actions extracted
                 actions = []
                 clean_t = self.normalize_text(trimmed)
-                if any(w in clean_t for w in ["tarea", "anota", "recordatorio", "recuerda", "agenda", "pendiente"]):
-                    actions.append(SubIntentAction(agent="secretary", tool="create_task", arguments={"title": trimmed, "priority": "medium"}))
+                is_task_query = any(q in clean_t for q in [
+                    "cuantas", "cuántas", "cuales", "cuáles", "que tareas", "qué tareas",
+                    "dime", "ver", "lista", "listar", "mostrar", "consultar", "mis tareas", "mis pendientes", "tengo"
+                ])
+                has_create_verb = any(c in clean_t for c in ["crea", "crear", "agrega", "agregar", "anota", "anotar", "nueva", "pon una", "programa"])
+
+                if any(w in clean_t for w in ["tarea", "anota", "agenda", "pendiente"]) and has_create_verb and not is_task_query:
+                    # Clean title: strip imperative prefixes and multi-agent conjunctions
+                    task_title = re.sub(r'^(?:por favor,?\s*)?(?:anota|anotar|crea|crear|agrega|agregar|nueva tarea para|una tarea para|tarea de|tarea para)\s*', '', trimmed, flags=re.IGNORECASE).strip()
+                    task_title = re.split(r'\s+\b(?:y|ademas|además|también|tambien|pero|despues|después)\b\s+', task_title, maxsplit=1, flags=re.IGNORECASE)[0].strip()
+                    actions.append(SubIntentAction(agent="secretary", tool="create_task", arguments={"title": task_title if task_title else trimmed, "priority": "medium"}))
+                elif any(w in clean_t for w in ["tarea", "tareas", "pendiente", "pendientes", "agenda"]):
+                    actions.append(SubIntentAction(agent="secretary", tool="list_tasks", arguments={"limit": 20}))
+                elif any(w in clean_t for w in ["recordatorio", "recordatorios", "recuerda"]):
+                    actions.append(SubIntentAction(agent="secretary", tool="list_reminders", arguments={"limit": 20}))
                 elif any(w in clean_t for w in ["correo", "email", "buzon"]):
-                    actions.append(SubIntentAction(agent="secretary", tool="list_unread_emails", arguments={"limit": 5}))
+                    actions.append(SubIntentAction(agent="secretary", tool="list_unread_emails", arguments={"limit": 20}))
 
                 if any(w in clean_t for w in ["saldo", "dinero", "flujo", "disponible", "quedan", "cuenta"]):
                     actions.append(SubIntentAction(agent="financial", tool="calculate_cash_flow", arguments={"period": "current_month"}))
                 elif any(w in clean_t for w in ["gasto", "gaste", "compre", "transaccion", "movimiento"]):
-                    actions.append(SubIntentAction(agent="financial", tool="list_transactions", arguments={"limit": 5}))
+                    actions.append(SubIntentAction(agent="financial", tool="list_transactions", arguments={"limit": 20}))
                 elif any(w in clean_t for w in ["tarjeta", "credito"]):
                     actions.append(SubIntentAction(agent="financial", tool="list_credit_cards", arguments={}))
                 elif any(w in clean_t for w in ["meta", "ahorro"]):

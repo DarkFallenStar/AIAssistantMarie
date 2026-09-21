@@ -43,6 +43,7 @@ class CreditCardTools(BaseTool):
         Retrieves active credit cards and their balances from database.
         """
         cards: List[Dict[str, Any]] = []
+        db_success = False
         client = get_supabase_client()
         if client:
             try:
@@ -50,7 +51,7 @@ class CreditCardTools(BaseTool):
                 if user_id:
                     query = query.eq("user_id", user_id)
                 res = query.execute()
-                if res and res.data:
+                if res and res.data is not None:
                     for c in res.data:
                         limit = float(c.get("credit_limit", 0))
                         balance = float(c.get("current_balance", 0))
@@ -68,10 +69,12 @@ class CreditCardTools(BaseTool):
                             "due_day": c.get("due_day"),
                             "status": c.get("status", "active")
                         })
+                db_success = True
             except Exception as exc:
                 print(f"[TOOL] Supabase get_credit_cards failed ({exc}), using mock fallback")
+                db_success = False
 
-        if not cards:
+        if not db_success:
             cards = [dict(c) for c in self._cards]
 
         total_debt = sum(c["current_balance"] for c in cards)

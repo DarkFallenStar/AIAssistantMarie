@@ -78,6 +78,7 @@ class MockEmailClient(BaseEmailClient):
 
     async def list_all(self, status: Optional[str] = None, limit: int = 10) -> List[EmailMessage]:
         supabase_results: List[EmailMessage] = []
+        db_success = False
         client = get_supabase_client()
         if client:
             try:
@@ -85,7 +86,7 @@ class MockEmailClient(BaseEmailClient):
                 if status:
                     query = query.eq("status", status)
                 res = query.execute()
-                if res and res.data:
+                if res and res.data is not None:
                     for row in res.data:
                         supabase_results.append(EmailMessage(
                             id=str(row.get("id")),
@@ -100,13 +101,15 @@ class MockEmailClient(BaseEmailClient):
                             is_important=bool(row.get("is_important", False)),
                             priority="HIGH" if row.get("is_important") else "MEDIUM"
                         ))
+                db_success = True
             except Exception as exc:
                 print(f"[EMAIL-MOCK] Supabase query failed ({exc}), using in-memory store")
+                db_success = False
 
         default_mock_ids = {item["id"] for item in self.SEEDED_EMAILS}
         seen_ids = {m.id for m in supabase_results}
 
-        if supabase_results:
+        if db_success:
             for em in self._emails:
                 if em.id not in default_mock_ids and em.id not in seen_ids:
                     if not status or em.status == status:

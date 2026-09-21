@@ -118,13 +118,14 @@ class TaskTools(BaseTool):
         self,
         status: Optional[str] = None,
         priority: Optional[str] = None,
-        limit: int = 10,
+        limit: int = 50,
         user_id: Optional[str] = None
     ) -> ToolResult:
         """
         Lists tasks filtered optionally by status ('pending', 'completed', etc.) or priority.
         """
         tasks: List[Dict[str, Any]] = []
+        db_success = False
         client = get_supabase_client()
         if client:
             try:
@@ -136,18 +137,20 @@ class TaskTools(BaseTool):
                 if priority:
                     query = query.eq("priority", priority)
                 res = query.execute()
-                if res and res.data:
+                if res and res.data is not None:
                     tasks.extend(res.data)
+                db_success = True
             except Exception as exc:
                 print(f"[TOOL] Supabase list_tasks failed ({exc}), using mock fallback")
+                db_success = False
 
         # Strict persistence priority:
-        # If database records are present, database is the Single Source of Truth.
+        # If database connection succeeded, database is the Single Source of Truth (zero-mock).
         default_mock_ids = {t["id"] for t in self.MOCK_TASKS}
         seen_ids = set()
         combined: List[Dict[str, Any]] = []
 
-        if tasks:
+        if db_success:
             # 1. Any newly created session task that isn't a static mock and isn't yet in DB query
             for t in self._tasks:
                 t_id = t.get("id")
@@ -165,7 +168,7 @@ class TaskTools(BaseTool):
                     seen_ids.add(t_id)
                     combined.append(t)
         else:
-            # Fallback when database is unreachable or offline
+            # Fallback ONLY when database is unreachable or offline
             for t in self._tasks:
                 t_id = t.get("id")
                 if t_id and t_id not in seen_ids:
@@ -179,7 +182,7 @@ class TaskTools(BaseTool):
         return ToolResult(
             success=True,
             data={"count": len(filtered), "tasks": filtered},
-            message=f"Se obtuvieron {len(filtered)} tareas de la agenda."
+            message=f"Se obtuvieron {len(filtered)} tareas de la agenda." if filtered else "No hay tareas registradas en la agenda."
         )
 
     async def update_task(
@@ -375,7 +378,7 @@ class TaskTools(BaseTool):
         task_id: Optional[str] = None,
         priority: Optional[str] = None,
         description: Optional[str] = None,
-        limit: int = 5,
+        limit: int = 20,
         user_id: Optional[str] = None,
         **kwargs
     ) -> ToolResult:

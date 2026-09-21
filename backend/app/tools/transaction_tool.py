@@ -194,7 +194,7 @@ class TransactionTools(BaseTool):
 
     async def get_transactions(
         self,
-        limit: int = 10,
+        limit: int = 50,
         category: Optional[str] = None,
         type: Optional[str] = None,
         source: Optional[str] = None,
@@ -204,6 +204,7 @@ class TransactionTools(BaseTool):
         Retrieves recent transactions, optionally filtered by category, type (income, expense), or source.
         """
         transactions: List[Dict[str, Any]] = []
+        db_success = False
         client = get_supabase_client()
         if client:
             try:
@@ -217,18 +218,20 @@ class TransactionTools(BaseTool):
                 if source:
                     query = query.eq("source", source.strip().lower())
                 res = query.execute()
-                if res and res.data:
+                if res and res.data is not None:
                     transactions.extend(res.data)
+                db_success = True
             except Exception as exc:
                 print(f"[TOOL] Supabase get_transactions failed ({exc}), using mock fallback")
+                db_success = False
 
         # Strict persistence priority:
-        # If database records are present, database is the Single Source of Truth.
+        # If database connection succeeded, database is the Single Source of Truth (zero-mock).
         default_mock_ids = {t.get("id") for t in self.MOCK_TRANSACTIONS}
         seen_ids = set()
         combined: List[Dict[str, Any]] = []
 
-        if transactions:
+        if db_success:
             # 1. Any newly created session transaction that isn't a static mock and isn't yet in DB query
             for t in self._transactions:
                 t_id = t.get("id")
@@ -247,7 +250,7 @@ class TransactionTools(BaseTool):
                     seen_ids.add(t_id)
                     combined.append(t)
         else:
-            # Fallback when database is unreachable or offline
+            # Fallback ONLY when database is unreachable or offline
             for t in self._transactions:
                 t_id = t.get("id")
                 if t_id and t_id not in seen_ids:
@@ -262,7 +265,7 @@ class TransactionTools(BaseTool):
         return ToolResult(
             success=True,
             data={"count": len(filtered), "transactions": filtered},
-            message=f"Se obtuvieron {len(filtered)} transacciones financieras."
+            message=f"Se obtuvieron {len(filtered)} transacciones financieras." if filtered else "No hay transacciones registradas."
         )
 
     async def create_transaction(
@@ -415,7 +418,7 @@ class TransactionTools(BaseTool):
     async def execute(
         self,
         action: str = "list",
-        limit: int = 5,
+        limit: int = 20,
         category: Optional[str] = None,
         type: Optional[str] = None,
         amount: Optional[float] = None,

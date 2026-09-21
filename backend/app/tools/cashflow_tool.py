@@ -45,6 +45,7 @@ class CashFlowTools(BaseTool):
         accounts: List[Dict[str, Any]] = []
         total_income = 0.0
         total_expenses = 0.0
+        db_success = False
 
         if client:
             try:
@@ -76,11 +77,13 @@ class CashFlowTools(BaseTool):
                             total_income += amt
                         elif tx_type == "expense":
                             total_expenses += amt
+                db_success = True
             except Exception as exc:
                 print(f"[TOOL] Supabase cashflow query failed ({exc}), using mock fallback")
+                db_success = False
 
-        # In-memory fallback if no database records
-        if not accounts:
+        # In-memory fallback ONLY if database query failed or offline
+        if not db_success:
             accounts = [dict(a) for a in self.MOCK_ACCOUNTS]
             total_income = self.MOCK_MONTHLY_SUMMARY["monthly_income"]
             total_expenses = self.MOCK_MONTHLY_SUMMARY["monthly_expenses"]

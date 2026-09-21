@@ -21,6 +21,20 @@ class TestMVP12MandatoryCases(unittest.TestCase):
         cls.client = TestClient(app)
         cls.orchestrator = get_orchestrator_service()
 
+    @classmethod
+    def tearDownClass(cls):
+        # Clean up any test artifacts created during test run
+        try:
+            from app.core.database import get_supabase_client
+            client = get_supabase_client()
+            if client:
+                client.table("tasks").delete().ilike("title", "%entregar proyecto%").execute()
+                client.table("transactions").delete().eq("merchant", "Restaurante XYZ").execute()
+                client.table("transactions").delete().eq("merchant", "Transporte").execute()
+                client.table("transactions").delete().eq("merchant", "Gasto en transporte").execute()
+        except Exception:
+            pass
+
     def test_01_backend_health(self):
         """TEST 01: GET /health returns HTTP 200 {'status': 'ok'}"""
         resp = self.client.get("/health")

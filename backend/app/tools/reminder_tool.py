@@ -106,13 +106,14 @@ class ReminderTools(BaseTool):
     async def list_reminders(
         self,
         status: Optional[str] = "active",
-        limit: int = 10,
+        limit: int = 50,
         user_id: Optional[str] = None
     ) -> ToolResult:
         """
         Lists reminders, filtering by status ('active', 'completed', 'all').
         """
         reminders: List[Dict[str, Any]] = []
+        db_success = False
         client = get_supabase_client()
         if client:
             try:
@@ -123,7 +124,7 @@ class ReminderTools(BaseTool):
                     db_status = "pending" if status == "active" else status
                     query = query.eq("status", db_status)
                 res = query.execute()
-                if res and res.data:
+                if res and res.data is not None:
                     for r in res.data:
                         reminders.append({
                             "id": r.get("id"),
@@ -133,13 +134,14 @@ class ReminderTools(BaseTool):
                             "status": "active" if r.get("status") == "pending" else r.get("status"),
                             "category": "reminder"
                         })
+                db_success = True
             except Exception as exc:
                 print(f"[TOOL] Supabase list_reminders failed ({exc}), using mock fallback")
+                db_success = False
 
-        # Supplement with in-memory reminders so demo/test reminders are always present
-        seen_ids = {r.get("id") for r in reminders}
-        for r in self._reminders:
-            if r.get("id") not in seen_ids:
+        if not db_success:
+            # Fallback ONLY when database is unreachable or offline
+            for r in self._reminders:
                 if status == "all" or r.get("status") == status:
                     reminders.append(r)
 
@@ -147,7 +149,7 @@ class ReminderTools(BaseTool):
         return ToolResult(
             success=True,
             data={"count": len(filtered), "reminders": filtered},
-            message=f"Se obtuvieron {len(filtered)} recordatorios."
+            message=f"Se obtuvieron {len(filtered)} recordatorios." if filtered else "No hay recordatorios registrados."
         )
 
     async def complete_reminder(
@@ -241,7 +243,7 @@ class ReminderTools(BaseTool):
         reminder_id: Optional[str] = None,
         status: Optional[str] = "active",
         description: Optional[str] = None,
-        limit: int = 10,
+        limit: int = 20,
         user_id: Optional[str] = None,
         **kwargs
     ) -> ToolResult:

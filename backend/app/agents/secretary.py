@@ -97,7 +97,7 @@ class SecretaryAgent(BaseAgent):
                 if search_query:
                     tools_to_run.append(("email_tool", {"action": "search", "search": search_query}))
                 else:
-                    tools_to_run.append(("email_tool", {"action": "list", "limit": 5}))
+                    tools_to_run.append(("email_tool", {"action": "list", "limit": 20}))
 
         # -------------------------------------------------------------
         # 2. REMINDER INTENT (Takes precedence over general tasks)
@@ -111,9 +111,9 @@ class SecretaryAgent(BaseAgent):
                 id_match = re.search(r'(?:recordatorio|id)\s+([a-zA-Z0-9_-]+)', request)
                 rid = id_match.group(1) if id_match else request
                 tools_to_run.append(("reminder_tool", {"action": "delete", "reminder_id": rid}))
-            elif any(kw in req_lower for kw in ["cuáles", "cuales", "lista", "ver", "qué", "que"]):
-                tools_to_run.append(("reminder_tool", {"action": "list", "status": "active"}))
-            else:
+            elif any(kw in req_lower for kw in ["cuáles", "cuales", "lista", "listar", "ver", "qué", "que", "tengo", "dime", "mostrar", "mis recordatorios", "consultar"]):
+                tools_to_run.append(("reminder_tool", {"action": "list", "status": "active", "limit": 20}))
+            elif any(kw in req_lower for kw in ["programa", "crea", "crear", "nuevo", "nueva", "pon", "agendar", "recuérdame", "recuerdame", "recuerda", "avísame", "avisame"]) and not any(q in req_lower for q in ["que", "qué", "cuales", "cuáles", "cuantos", "cuántos", "tengo", "dime", "ver"]):
                 # Create reminder
                 time_match = re.search(r'(?:a las?|para las?|el|mañana|hoy)\s+([0-9:apmAPM\s]+(?:de la (?:tarde|mañana|noche))?)', request, re.IGNORECASE)
                 remind_at = time_match.group(0).strip() if time_match else "Hoy, horario pendiente"
@@ -125,6 +125,8 @@ class SecretaryAgent(BaseAgent):
                     "title": clean_title if clean_title else request,
                     "remind_at": remind_at
                 }))
+            else:
+                tools_to_run.append(("reminder_tool", {"action": "list", "status": "active", "limit": 20}))
 
         # -------------------------------------------------------------
         # 3. TASK INTENT
@@ -142,7 +144,10 @@ class SecretaryAgent(BaseAgent):
                 tid = id_match.group(1) if id_match else request
                 priority = "urgent" if "urgente" in req_lower else ("high" if "alta" in req_lower else "medium")
                 tools_to_run.append(("task_tool", {"action": "update", "task_id": tid, "priority": priority}))
-            elif any(kw in req_lower for kw in ["crear", "crea", "agrega", "anota", "nueva"]):
+            elif (
+                any(kw in req_lower for kw in ["crear", "crea", "agrega", "anota", "nueva"])
+                and not any(q in req_lower for q in ["que", "qué", "cuales", "cuáles", "cuantas", "cuántas", "ver", "dime", "mostrar", "listar", "tengo", "mis tareas", "mis pendientes"])
+            ):
                 priority = "urgent" if "urgente" in req_lower else ("high" if "alta" in req_lower else "medium")
                 time_match = re.search(r'(?:para|el)\s+(mañana|hoy|[0-9-]+)', req_lower)
                 due_date = time_match.group(0) if time_match else None
@@ -154,11 +159,11 @@ class SecretaryAgent(BaseAgent):
                     "due_date": due_date
                 }))
             else:
-                tools_to_run.append(("task_tool", {"action": "list"}))
+                tools_to_run.append(("task_tool", {"action": "list", "limit": 20}))
 
         # Default fallback
         if not tools_to_run:
-            tools_to_run.append(("task_tool", {"action": "list"}))
+            tools_to_run.append(("task_tool", {"action": "list", "limit": 20}))
 
         return tools_to_run
 
