@@ -118,7 +118,11 @@ class TransactionTools(BaseTool):
         merchant: Optional[str] = None,
         account_id: Optional[str] = None,
         credit_card_id: Optional[str] = None,
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        currency: str = "USD",
+        source: str = "voice_agent",
+        transaction_date: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None
     ) -> ToolResult:
         """
         Records a new financial transaction (income or expense) in the database.
@@ -126,6 +130,7 @@ class TransactionTools(BaseTool):
         clean_amount = abs(float(amount))
         tx_id = str(uuid.uuid4())
         eff_user_id = user_id or DEFAULT_USER_ID
+        tx_date = transaction_date or datetime.now(timezone.utc).isoformat()
 
         payload = {
             "id": tx_id,
@@ -134,13 +139,14 @@ class TransactionTools(BaseTool):
             "credit_card_id": credit_card_id,
             "type": type.lower() if type in ["income", "expense", "transfer"] else "expense",
             "amount": clean_amount,
-            "currency": "USD",
+            "currency": (currency or "USD").upper(),
             "category": (category or "general").strip().lower(),
             "description": description or f"Movimiento {type}",
             "merchant": merchant or description or "Comercio",
-            "transaction_date": datetime.now(timezone.utc).isoformat(),
+            "transaction_date": tx_date,
             "status": "posted",
-            "source": "voice_agent"
+            "source": source if source in ["manual", "webhook_bank", "voice_agent", "email_import"] else "webhook_bank",
+            "metadata": metadata or {}
         }
 
         # Keep in-memory copy updated
@@ -156,7 +162,7 @@ class TransactionTools(BaseTool):
         return ToolResult(
             success=True,
             data=payload,
-            message=f"Transacción de ${clean_amount:.2f} USD ({payload['type']}) en '{payload['category']}' registrada correctamente."
+            message=f"Transacción de ${clean_amount:.2f} {payload['currency']} ({payload['type']}) en '{payload['category']}' registrada correctamente."
         )
 
     async def categorize_transaction(
