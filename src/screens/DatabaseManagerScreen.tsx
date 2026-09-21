@@ -523,18 +523,26 @@ export default function DatabaseManagerScreen({
       {/* Modal: Formulario CRUD de Creación */}
       <Modal visible={isModalVisible} animationType="slide" transparent={true}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
           style={styles.modalOverlay}
         >
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Nuevo: {activeTabConfig?.title}</Text>
-              <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+              <TouchableOpacity
+                onPress={() => setIsModalVisible(false)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
                 <Text style={styles.modalCloseText}>✕</Text>
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalScroll}>
+            <ScrollView
+              style={styles.modalScroll}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
               {/* Form fields for Tasks & Reminders */}
               {(activeTab === 'tasks' || activeTab === 'reminders') && (
                 <>
@@ -1199,13 +1207,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     marginTop: 8,
+    marginBottom: Platform.OS === 'ios' ? 12 : 6,
   },
   cancelModalBtn: {
     flex: 1,
+    minHeight: 44,
     paddingVertical: 12,
     borderRadius: 10,
     backgroundColor: '#334155',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   cancelModalBtnText: {
     color: '#E2E8F0',
@@ -1214,10 +1225,12 @@ const styles = StyleSheet.create({
   },
   saveModalBtn: {
     flex: 2,
+    minHeight: 44,
     paddingVertical: 12,
     borderRadius: 10,
     backgroundColor: '#10B981',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   saveModalBtnText: {
     color: '#FFFFFF',

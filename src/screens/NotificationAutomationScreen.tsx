@@ -138,6 +138,7 @@ export default function NotificationAutomationScreen({
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         {/* Header */}
         <View style={styles.header}>
@@ -466,16 +467,20 @@ const styles = StyleSheet.create({
   },
   headerTitleContainer: {
     alignItems: 'center',
+    flexShrink: 1,
+    marginHorizontal: 8,
   },
   headerTitle: {
     color: '#f8fafc',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
+    textAlign: 'center',
   },
   headerSubtitle: {
     color: '#64748b',
-    fontSize: 11,
+    fontSize: 10,
     marginTop: 2,
+    textAlign: 'center',
   },
   diagButton: {
     paddingVertical: 6,
@@ -494,7 +499,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#111827',
     paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
+    flexWrap: 'wrap',
     borderBottomWidth: 1,
     borderBottomColor: '#1f2937',
   },

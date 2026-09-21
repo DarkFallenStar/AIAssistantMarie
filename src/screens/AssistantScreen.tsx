@@ -11,6 +11,7 @@ import {
   Alert,
   Keyboard,
   TouchableWithoutFeedback,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -339,59 +340,65 @@ export default function AssistantScreen({
             </View>
           </View>
 
-          <View style={styles.headerRight}>
-            <TouchableOpacity
-              style={[styles.ttsToggleButton, isTTSActive ? styles.ttsActiveBtn : styles.ttsMutedBtn]}
-              onPress={() => {
-                if (isTTSActive) {
-                  Speech.stop();
-                }
-                setIsTTSActive((prev) => !prev);
-              }}
-              activeOpacity={0.7}
-              accessibilityLabel={isTTSActive ? "Desactivar síntesis de voz" : "Activar síntesis de voz"}
+          <View style={styles.headerRightContainer}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.headerRightScroll}
             >
-              <Text style={styles.ttsToggleText}>{isTTSActive ? '🔊 Voz' : '🔇 Mute'}</Text>
-            </TouchableOpacity>
-
-            {onOpenDatabase && (
               <TouchableOpacity
-                style={[styles.diagButton, styles.databaseBtn]}
-                onPress={onOpenDatabase}
+                style={[styles.ttsToggleButton, isTTSActive ? styles.ttsActiveBtn : styles.ttsMutedBtn]}
+                onPress={() => {
+                  if (isTTSActive) {
+                    Speech.stop();
+                  }
+                  setIsTTSActive((prev) => !prev);
+                }}
                 activeOpacity={0.7}
+                accessibilityLabel={isTTSActive ? "Desactivar síntesis de voz" : "Activar síntesis de voz"}
               >
-                <Text style={styles.databaseBtnText}>📊 Datos</Text>
+                <Text style={styles.ttsToggleText}>{isTTSActive ? '🔊 Voz' : '🔇 Mute'}</Text>
               </TouchableOpacity>
-            )}
 
-            {onOpenDiagnostics && (
+              {onOpenDatabase && (
+                <TouchableOpacity
+                  style={[styles.diagButton, styles.databaseBtn]}
+                  onPress={onOpenDatabase}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.databaseBtnText}>📊 Datos</Text>
+                </TouchableOpacity>
+              )}
+
+              {onOpenDiagnostics && (
+                <TouchableOpacity
+                  style={styles.diagButton}
+                  onPress={onOpenDiagnostics}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.diagButtonText}>⚙️ Red</Text>
+                </TouchableOpacity>
+              )}
+
+              {onOpenAutomation && (
+                <TouchableOpacity
+                  style={styles.diagButton}
+                  onPress={onOpenAutomation}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.diagButtonText}>🏦 Banco</Text>
+                </TouchableOpacity>
+              )}
+
               <TouchableOpacity
-                style={styles.diagButton}
-                onPress={onOpenDiagnostics}
+                style={styles.clearChatBtn}
+                onPress={handleClearChat}
                 activeOpacity={0.7}
+                accessibilityLabel="Limpiar historial de conversación"
               >
-                <Text style={styles.diagButtonText}>⚙️ Red</Text>
+                <Text style={styles.clearChatBtnText}>🗑️</Text>
               </TouchableOpacity>
-            )}
-
-            {onOpenAutomation && (
-              <TouchableOpacity
-                style={styles.diagButton}
-                onPress={onOpenAutomation}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.diagButtonText}>🏦 Banco</Text>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity
-              style={styles.clearChatBtn}
-              onPress={handleClearChat}
-              activeOpacity={0.7}
-              accessibilityLabel="Limpiar historial de conversación"
-            >
-              <Text style={styles.clearChatBtnText}>🗑️</Text>
-            </TouchableOpacity>
+            </ScrollView>
           </View>
         </View>
 
@@ -507,10 +514,11 @@ const styles = StyleSheet.create({
     borderBottomColor: '#1e293b',
   },
   headerLeft: {
-    flex: 1,
+    flexShrink: 1,
+    marginRight: 10,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
     color: '#f8fafc',
     letterSpacing: 0.3,
@@ -526,6 +534,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     borderWidth: 1,
     borderColor: '#1f2937',
+    maxWidth: '100%',
   },
   serverDot: {
     width: 6,
@@ -539,10 +548,15 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
-  headerRight: {
+  headerRightContainer: {
+    flexGrow: 0,
+    maxWidth: '62%',
+  },
+  headerRightScroll: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+    paddingVertical: 2,
   },
   ttsToggleButton: {
     paddingHorizontal: 8,
@@ -697,15 +711,16 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     paddingHorizontal: 16,
     paddingVertical: 10,
+    minHeight: 44,
     color: '#f8fafc',
     fontSize: 14,
     borderWidth: 1,
     borderColor: '#334155',
   },
   sendButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#2563eb',
     justifyContent: 'center',
     alignItems: 'center',

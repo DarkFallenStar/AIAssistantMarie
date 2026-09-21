@@ -69,17 +69,17 @@ const styles = StyleSheet.create({
   },
   userContainer: {
     justifyContent: 'flex-end',
-    paddingLeft: 40,
+    paddingLeft: 20,
   },
   assistantContainer: {
     justifyContent: 'flex-start',
-    paddingRight: 40,
+    paddingRight: 20,
   },
   bubble: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderRadius: 18,
-    maxWidth: '100%',
+    maxWidth: '88%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,

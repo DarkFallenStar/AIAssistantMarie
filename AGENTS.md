@@ -261,4 +261,20 @@ SECRETARY AGENT       FINANCIAL AGENT           OTHER AGENTS...
    - 100% synchronization maintained between `src/` and `mobile/src/`.
    - 202 automated tests passing (186 backend + 16 mobile).
 
+### Q. Strict Zero-Regression Responsiveness & Multi-Device Ergonomics Standard
+1. **Fluid Widths & Flex Wrapping Over Fixed Dimensions**:
+   - Hardcoded fixed widths that exceed compact viewports (<= 360px) are STRICTLY FORBIDDEN.
+   - Any horizontal group of action buttons, pills, tags, or badges MUST use either `flexWrap: 'wrap'` with appropriate `gap` or a horizontal scroll container (`ScrollView horizontal showsHorizontalScrollIndicator={false}`).
+   - Text containers beside action buttons or badges MUST specify `flexShrink: 1` to prevent text truncation from pushing interactive elements off-screen.
+2. **Keyboard Displacement & Form Visibility**:
+   - All input forms and interactive views MUST use `KeyboardAvoidingView` configured with `behavior={Platform.OS === 'ios' ? 'padding' : 'height'}` and `keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}`.
+   - Scrollable lists and modal sheets MUST specify `keyboardShouldPersistTaps="handled"` and allow dismissing the keyboard when tapping outside via `TouchableWithoutFeedback` with `Keyboard.dismiss`.
+   - Action buttons inside modal sheets must remain accessible and never be hidden behind the virtual keyboard.
+3. **Touch Targets & Visual Ergonomics**:
+   - Interactive touch targets (buttons, mic triggers, icons, checkboxes) MUST maintain a minimum tappable area of 44x44px (`minHeight: 44`, `minWidth: 44` or `hitSlop`).
+   - Chat bubbles must adapt dynamically to screen size: using `maxWidth: '85%'` or `maxWidth: '88%'` with responsive side padding rather than wide static margins.
+4. **Permanent Parity Rule**:
+   - Every UI component or screen updated in `src/` MUST be replicated identically in `mobile/src/` to prevent divergent behavior.
+
+
 
