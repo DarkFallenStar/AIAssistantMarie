@@ -152,3 +152,12 @@ SECRETARY AGENT       FINANCIAL AGENT           OTHER AGENTS...
 4. **Backend TTS Sizing & MIME Types**:
    - The `/tts` endpoint and static audio handler must always stream standard `audio/wav` with valid RIFF headers and non-zero byte size to ensure compatibility with mobile players.
 
+### H. Android Notification Ingestion & Automation
+1. **Expo Go vs Native Android**:
+   - In Expo Go (standard client), arbitrary native Java/Kotlin services (`NotificationListenerService`) cannot be executed without `expo prebuild`.
+   - For live workshop testing on physical devices, use **MacroDroid** (or Automate/Tasker) which natively binds `NotificationListenerService` and dispatches HTTP `POST` requests to `/webhooks/bank` via Tailscale/LAN.
+   - For in-app simulation, `NotificationAutomationScreen.tsx` provides presets and real-time transaction monitoring with direct feedback from the LLM Structured Output.
+2. **ISO 8601 Date Resiliency in Webhook Extractors**:
+   - LLMs can return non-standard date strings (e.g. "ahora", "hoy"). Webhook extractors MUST always validate and parse dates to valid ISO 8601 strings (`datetime.now(timezone.utc).isoformat()`) before inserting into PostgreSQL columns of type `timestamp with time zone`.
+
+

@@ -71,10 +71,11 @@ class TransactionTools(BaseTool):
         limit: int = 10,
         category: Optional[str] = None,
         type: Optional[str] = None,
+        source: Optional[str] = None,
         user_id: Optional[str] = None
     ) -> ToolResult:
         """
-        Retrieves recent transactions, optionally filtered by category or transaction type (income, expense).
+        Retrieves recent transactions, optionally filtered by category, type (income, expense), or source.
         """
         transactions: List[Dict[str, Any]] = []
         client = get_supabase_client()
@@ -87,6 +88,8 @@ class TransactionTools(BaseTool):
                     query = query.ilike("category", f"%{category.strip()}%")
                 if type:
                     query = query.eq("type", type.strip().lower())
+                if source:
+                    query = query.eq("source", source.strip().lower())
                 res = query.execute()
                 if res and res.data:
                     transactions.extend(res.data)
@@ -99,7 +102,8 @@ class TransactionTools(BaseTool):
             if t.get("id") not in seen_ids:
                 matches_cat = not category or category.lower() in t.get("category", "").lower()
                 matches_type = not type or t.get("type", "").lower() == type.lower()
-                if matches_cat and matches_type:
+                matches_source = not source or t.get("source", "").lower() == source.lower()
+                if matches_cat and matches_type and matches_source:
                     transactions.append(t)
 
         filtered = transactions[:limit]

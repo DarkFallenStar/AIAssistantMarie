@@ -67,10 +67,16 @@ class BankWebhookExtractor:
             data = json.loads(cleaned_json)
             # Validar y normalizar con el esquema Pydantic
             raw_date = data.get("date")
-            if not raw_date or not isinstance(raw_date, str) or raw_date.strip().lower() in ["none", "null", ""]:
-                date_val = datetime.now(timezone.utc).isoformat()
-            else:
-                date_val = raw_date.strip()
+            date_val = datetime.now(timezone.utc).isoformat()
+            if raw_date and isinstance(raw_date, str) and raw_date.strip().lower() not in ["none", "null", "", "ahora", "hoy", "ayer"]:
+                try:
+                    # Verificar si se puede parsear como fecha/ISO
+                    # Manejar formatos comunes como YYYY-MM-DDTHH:MM:SS o YYYY-MM-DD
+                    parsed_dt = datetime.fromisoformat(raw_date.strip().replace("Z", "+00:00"))
+                    date_val = parsed_dt.isoformat()
+                except Exception:
+                    date_val = datetime.now(timezone.utc).isoformat()
+
 
             return ExtractedBankTransaction(
                 amount=abs(float(data.get("amount", 0))),

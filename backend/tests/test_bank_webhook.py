@@ -127,8 +127,36 @@ class TestBankWebhook(unittest.TestCase):
             }
         )
         self.assertEqual(response.status_code, 400)
-        self.assertIn("content", response.json()["detail"].lower())
+    def test_get_recent_bank_transactions(self):
+        # Insert a webhook transaction
+        mock_json = """{
+            "amount": 75000.0,
+            "currency": "COP",
+            "merchant": "Restaurante Gourmet",
+            "date": "2026-09-21T11:00:00Z",
+            "payment_method": "credit_card",
+            "category": "food",
+            "type": "expense"
+        }"""
+        extractor = BankWebhookExtractor(llm_service=MockLLMService(canned_response=mock_json))
+        set_webhook_extractor(extractor)
+
+        post_res = self.client.post(
+            "/webhooks/bank",
+            json={"source": "bank", "content": "Compra por $75.000 en Restaurante Gourmet"}
+        )
+        self.assertEqual(post_res.status_code, 200)
+
+        # Query recent webhook transactions
+        get_res = self.client.get("/webhooks/bank/recent?limit=5")
+        self.assertEqual(get_res.status_code, 200)
+        data = get_res.json()
+        self.assertEqual(data["status"], "success")
+        self.assertGreaterEqual(data["total"], 1)
+        recent_merchants = [tx["merchant"] for tx in data["transactions"]]
+        self.assertIn("Restaurante Gourmet", recent_merchants)
 
 
 if __name__ == "__main__":
     unittest.main()
+

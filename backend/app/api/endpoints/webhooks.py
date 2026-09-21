@@ -90,3 +90,25 @@ async def bank_webhook(
         transaction_id=tx_result.data["id"],
         extracted=extracted
     )
+
+
+@router.get("/bank/recent", summary="Consultar transacciones bancarias recientes procesadas por webhook")
+async def get_recent_bank_transactions(
+    limit: int = 10,
+    user_id: Optional[str] = None
+):
+    """
+    Retorna las transacciones registradas con source='webhook_bank' para
+    monitoreo en tiempo real desde la aplicación móvil o paneles de automatización.
+    """
+    tools = get_transaction_tools()
+    res = await tools.get_transactions(limit=limit, user_id=user_id, source="webhook_bank")
+    if not res.success or not res.data:
+        return {"status": "success", "total": 0, "transactions": []}
+
+    return {
+        "status": "success",
+        "total": res.data.get("count", 0),
+        "transactions": res.data.get("transactions", [])
+    }
+

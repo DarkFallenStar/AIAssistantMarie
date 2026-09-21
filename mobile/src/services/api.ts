@@ -28,6 +28,50 @@ export interface DatabaseStatusResponse {
   latencyMs?: number;
 }
 
+export interface BankWebhookPayload {
+  source: string;
+  content: string;
+  user_id?: string;
+}
+
+export interface ExtractedBankTransaction {
+  amount: number;
+  currency: string;
+  merchant: string;
+  date: string;
+  payment_method: string;
+  category: string;
+  type: string;
+}
+
+export interface BankWebhookResponse {
+  status: string;
+  message: string;
+  transaction_id: string;
+  extracted: ExtractedBankTransaction;
+}
+
+export interface WebhookRecentTransaction {
+  id: string;
+  amount: number;
+  currency: string;
+  merchant?: string;
+  category: string;
+  type: string;
+  description?: string;
+  transaction_date?: string;
+  source: string;
+  status?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface WebhookRecentTransactionsResponse {
+  status: string;
+  total: number;
+  transactions: WebhookRecentTransaction[];
+}
+
+
 export function normalizeUrl(url: string): string {
   let clean = url.trim();
   if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
@@ -252,3 +296,88 @@ export async function sendAudioRecording(
     throw new Error(err.message || 'Error al subir grabación de audio a /voice');
   }
 }
+
+/**
+  * Dispatches a bank notification payload to the webhook endpoint (POST /webhooks/bank).
+  */
+export async function sendBankWebhook(
+  baseUrl: string,
+  payload: BankWebhookPayload,
+  timeoutMs: number = 25000
+): Promise<BankWebhookResponse> {
+  const url = `${normalizeUrl(baseUrl)}/webhooks/bank`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      let errorDetail = `HTTP ${res.status}`;
+      try {
+        const errorData = await res.json();
+        if (errorData?.detail) errorDetail = errorData.detail;
+      } catch (_) {}
+      throw new Error(errorDetail);
+    }
+
+    return await res.json();
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error(`Tiempo de espera agotado (${timeoutMs}ms) al enviar webhook bancario.`);
+    }
+    throw new Error(err.message || 'Error procesando webhook bancario');
+  }
+}
+
+/**
+  * Fetches recent transactions captured by the bank webhook (GET /webhooks/bank/recent).
+  */
+export async function getRecentWebhookTransactions(
+  baseUrl: string,
+  limit: number = 10,
+  timeoutMs: number = 10000
+): Promise<WebhookRecentTransactionsResponse> {
+  const url = `${normalizeUrl(baseUrl)}/webhooks/bank/recent?limit=${limit}`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      let errorDetail = `HTTP ${res.status}`;
+      try {
+        const errorData = await res.json();
+        if (errorData?.detail) errorDetail = errorData.detail;
+      } catch (_) {}
+      throw new Error(errorDetail);
+    }
+
+    return await res.json();
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error(`Tiempo de espera agotado (${timeoutMs}ms) al consultar transacciones del webhook.`);
+    }
+    throw new Error(err.message || 'Error al obtener transacciones del webhook');
+  }
+}
+

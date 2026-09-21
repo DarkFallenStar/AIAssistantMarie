@@ -31,6 +31,7 @@ import { sendChatMessage, sendAudioRecording } from '../services/api';
 interface AssistantScreenProps {
   backendUrl?: string;
   onOpenDiagnostics?: () => void;
+  onOpenAutomation?: () => void;
 }
 
 /**
@@ -53,6 +54,7 @@ function stripMarkdownForTTS(text: string): string {
 export default function AssistantScreen({
   backendUrl = DEFAULT_BACKEND_URL,
   onOpenDiagnostics,
+  onOpenAutomation,
 }: AssistantScreenProps) {
   const [state, setState] = useState<AssistantState>('IDLE');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -321,6 +323,16 @@ export default function AssistantScreen({
                 activeOpacity={0.7}
               >
                 <Text style={styles.diagButtonText}>⚙️ Red</Text>
+              </TouchableOpacity>
+            )}
+
+            {onOpenAutomation && (
+              <TouchableOpacity
+                style={styles.diagButton}
+                onPress={onOpenAutomation}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.diagButtonText}>🏦 Banco</Text>
               </TouchableOpacity>
             )}
           </View>
