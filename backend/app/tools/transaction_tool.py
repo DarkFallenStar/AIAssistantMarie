@@ -96,17 +96,33 @@ class TransactionTools(BaseTool):
             except Exception as exc:
                 print(f"[TOOL] Supabase get_transactions failed ({exc}), using mock fallback")
 
-        # Supplement with in-memory transactions
-        seen_ids = {t.get("id") for t in transactions}
+        # Supplement with in-memory transactions: prioritize newly created transactions in current session
+        seen_ids = set()
+        combined: List[Dict[str, Any]] = []
+
+        # 1. Local session transactions first
         for t in self._transactions:
-            if t.get("id") not in seen_ids:
+            t_id = t.get("id")
+            if t_id and t_id not in seen_ids:
+                seen_ids.add(t_id)
                 matches_cat = not category or category.lower() in t.get("category", "").lower()
                 matches_type = not type or t.get("type", "").lower() == type.lower()
                 matches_source = not source or t.get("source", "").lower() == source.lower()
                 if matches_cat and matches_type and matches_source:
-                    transactions.append(t)
+                    combined.append(t)
 
-        filtered = transactions[:limit]
+        # 2. Remote database records
+        for t in transactions:
+            t_id = t.get("id")
+            if t_id and t_id not in seen_ids:
+                seen_ids.add(t_id)
+                matches_cat = not category or category.lower() in t.get("category", "").lower()
+                matches_type = not type or t.get("type", "").lower() == type.lower()
+                matches_source = not source or t.get("source", "").lower() == source.lower()
+                if matches_cat and matches_type and matches_source:
+                    combined.append(t)
+
+        filtered = combined[:limit]
         return ToolResult(
             success=True,
             data={"count": len(filtered), "transactions": filtered},

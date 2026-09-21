@@ -1,24 +1,33 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+import uuid
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status
 from pathlib import Path
 from app.schemas.voice import VoiceUploadResponse
 from app.audio.stt import get_stt_service
 from app.audio.tts import get_tts_service
 from app.agents.orchestrator import get_orchestrator_service
+from app.core.security import verify_api_bearer_token
 
 router = APIRouter()
 
 UPLOAD_DIR = Path("uploads/audio")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+# 25MB maximum upload limit
+MAX_AUDIO_SIZE_BYTES = 25 * 1024 * 1024
+ALLOWED_AUDIO_EXTENSIONS = {".m4a", ".wav", ".mp3", ".aac", ".ogg", ".flac", ".mp4", ".caf"}
+
 @router.post("/voice", response_model=VoiceUploadResponse, summary="Captura de Audio y Speech To Text (Fase 6)")
-async def upload_voice(file: UploadFile = File(...)):
+async def upload_voice(
+    file: UploadFile = File(...),
+    _authorized: bool = Depends(verify_api_bearer_token)
+):
     """
     Recibe el archivo binario de audio grabado desde la aplicación móvil.
     Convierte el audio a texto (Speech To Text) y lo pasa como entrada al Orquestador.
     Sintetiza la respuesta en audio mediante TTS (Fase 13).
     """
     if not file.filename:
-        raise HTTPException(status_code=400, detail="No se proporciono archivo de audio.")
+        raise HTTPException(status_code=400, detail="No se proporcionó archivo de audio.")
     
     contents = await file.read()
     size_bytes = len(contents)
@@ -26,12 +35,23 @@ async def upload_voice(file: UploadFile = File(...)):
     if size_bytes == 0:
         raise HTTPException(status_code=400, detail="El archivo de audio recibido esta vacio (0 bytes).")
     
-    safe_filename = Path(file.filename).name
+    if size_bytes > MAX_AUDIO_SIZE_BYTES:
+        raise HTTPException(
+            status_code=getattr(status, "HTTP_413_CONTENT_TOO_LARGE", status.HTTP_413_REQUEST_ENTITY_TOO_LARGE),
+            detail=f"El archivo de audio excede el límite permitido de 25MB ({size_bytes} bytes recibidos)."
+        )
+    
+    # Path Traversal prevention & safe filename generation on disk
+    original_name = Path(file.filename).name
+    raw_ext = Path(file.filename).suffix.lower()
+    safe_ext = raw_ext if raw_ext in ALLOWED_AUDIO_EXTENSIONS else ".m4a"
+    clean_base = Path(file.filename).stem[:30]
+    safe_filename = f"{uuid.uuid4().hex[:8]}_{clean_base}{safe_ext}"
     save_path = UPLOAD_DIR / safe_filename
     with open(save_path, "wb") as f:
         f.write(contents)
     
-    print(f"[VOICE] Audio guardado: {safe_filename} ({size_bytes} bytes, tipo: {file.content_type})")
+    print(f"[VOICE] Audio guardado de forma segura: {safe_filename} ({size_bytes} bytes, tipo: {file.content_type})")
     
     # 1. Transcripción Speech To Text (STT)
     stt_service = get_stt_service()
@@ -57,7 +77,7 @@ async def upload_voice(file: UploadFile = File(...)):
     
     return VoiceUploadResponse(
         status="success",
-        filename=safe_filename,
+        filename=original_name,
         size_bytes=size_bytes,
         content_type=file.content_type,
         transcribed_text=transcribed_text,

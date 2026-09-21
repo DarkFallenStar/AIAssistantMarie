@@ -167,4 +167,24 @@ SECRETARY AGENT       FINANCIAL AGENT           OTHER AGENTS...
 4. **CLI Process Hygiene on Windows**:
    - Never leave blocking `tailscale up` or `tailscale login` CLI processes lingering in background without timeouts; the native Windows GUI (`tailscale-ipn.exe`) handles interactive authentication seamlessly.
 
+### J. Security Hardening & Secret Management (Fase 17)
+1. **Strict Git Exclusion for Environment Secrets**:
+   - `.env` and `.env.*` MUST ALWAYS be listed in `.gitignore` (with exception for `!.env.example`).
+   - NEVER commit `.env` to Git. Verify with `git check-ignore -v .env` before committing any phase.
+   - Maintain `.env.example` in the project root and `backend/.env.example` with up-to-date documentation and placeholders.
+2. **Bearer Token & Webhook Authentication**:
+   - Protected endpoints (`/chat`, `/voice`, `/tts`, `/db/status`, `/webhooks/bank/recent`) validate `Authorization: Bearer <token>` or `X-API-Key: <token>` using constant-time comparison (`secrets.compare_digest`).
+   - Webhook endpoint (`/webhooks/bank`) validates `X-Webhook-Secret: <secret>` using `secrets.compare_digest`.
+   - When `API_BEARER_TOKEN` or `BANK_WEBHOOK_SECRET` are empty (`""`) in `.env`, the backend runs in permissive development mode with security notices in console. When configured, unauthenticated requests are strictly rejected with HTTP 401.
+   - Public endpoints (`/`, `/health`, `/docs`, `/openapi.json`) remain accessible without tokens.
+3. **Defense-in-Depth Input Validation**:
+   - `ChatRequest`: Enforce length constraints (1 to 4096 chars) and whitespace stripping.
+   - `VoiceUpload`: Enforce 25MB maximum upload limit (HTTP 413) and sanitize filenames on disk using UUID prefixes to block Directory Traversal attacks while preserving client filename in response.
+   - `TTS`: Enforce maximum 2000 chars text limit and sanitize audio file requests to prevent path traversal outside `TTS_DIR`.
+   - `BankWebhookPayload`: Enforce 2000 chars max content limit, validate UUID syntax for optional `user_id`.
+4. **API Key URL Sanitization**:
+   - External LLM REST calls (Google AI Studio) MUST pass `x-goog-api-key` in HTTP headers instead of appending `?key=` query parameters to avoid leaking secrets in proxy or server logs.
+5. **Mobile-Backend Auth Parity**:
+   - Maintain 100% parity between `src/services/api.ts` and `mobile/src/services/api.ts`. Both attach `getAuthHeaders()` to all protected backend calls and inject `X-Webhook-Secret` into bank webhooks.
+
 

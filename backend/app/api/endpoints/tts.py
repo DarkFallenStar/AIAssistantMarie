@@ -1,16 +1,17 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from typing import Optional
 from pathlib import Path
 from app.audio.tts import get_tts_service, TTS_DIR
+from app.core.security import verify_api_bearer_token
 
 router = APIRouter()
 
 
 class TTSRequest(BaseModel):
-    text: str = Field(..., min_length=1, description="Texto a sintetizar en audio")
-    voice: Optional[str] = Field(default="es", description="Código o nombre de voz (ej: 'es')")
+    text: str = Field(..., min_length=1, max_length=2000, description="Texto a sintetizar en audio")
+    voice: Optional[str] = Field(default="es", max_length=50, description="Código o nombre de voz (ej: 'es')")
 
 
 class TTSResponse(BaseModel):
@@ -20,7 +21,11 @@ class TTSResponse(BaseModel):
 
 
 @router.post("/tts", summary="Sintetizar texto a audio (Fase 13 - TTS)")
-async def text_to_speech(request: TTSRequest, as_json: bool = Query(False, description="Si es True, devuelve JSON con audio_url")):
+async def text_to_speech(
+    request: TTSRequest,
+    as_json: bool = Query(False, description="Si es True, devuelve JSON con audio_url"),
+    _authorized: bool = Depends(verify_api_bearer_token),
+):
     """
     Convierte el texto recibido a un archivo de audio mediante el servicio TTS.
     Por defecto devuelve el archivo binario de audio (.wav).
@@ -51,9 +56,14 @@ async def text_to_speech(request: TTSRequest, as_json: bool = Query(False, descr
 async def get_tts_audio(filename: str):
     """
     Descarga o reproduce el archivo de audio TTS generado previamente.
+    Protegido contra ataques de Directory Traversal.
     """
     safe_name = Path(filename).name
-    file_path = TTS_DIR / safe_name
+    file_path = (TTS_DIR / safe_name).resolve()
+    base_dir = TTS_DIR.resolve()
+
+    if not str(file_path).startswith(str(base_dir)):
+        raise HTTPException(status_code=400, detail="Acceso denegado: ruta de archivo no permitida.")
 
     if not file_path.exists() or not file_path.is_file():
         raise HTTPException(status_code=404, detail="Archivo de audio no encontrado.")

@@ -80,36 +80,44 @@ PersonalAssistantAI/
    pip install -r requirements.txt
    ```
 
-4. Configura el archivo de variables de entorno `.env` en la carpeta `backend/`:
+4. Configura el archivo de variables de entorno `.env` en la raíz del proyecto a partir de `.env.example`:
+   ```powershell
+   copy .env.example .env
+   ```
+   *Nota de seguridad (Fase 17)*: El archivo `.env` está estrictamente ignorado por `.gitignore` y **NUNCA** debe subirse a Git.
+   
+   Ejemplo de variables principales en `.env`:
    ```env
-   # Backend Environment Configuration
+   # Backend & Servidor
    ENVIRONMENT=development
    PORT=8000
    HOST=0.0.0.0
 
-   # CORS
-   CORS_ORIGINS=["*"]
+   # Seguridad y Autenticación
+   API_BEARER_TOKEN=              # Si se deja vacío, permite modo desarrollo
+   BANK_WEBHOOK_SECRET=           # Header X-Webhook-Secret para MacroDroid/Tasker
 
-   # Proveedor LLM: "google" | "ollama" | "mock"
-   LLM_PROVIDER=google
-
-   # Si usas Google AI Studio (Gemini):
-   GEMINI_API_KEY=AIzaSyTuClaveAqui
-   GEMINI_MODEL=gemini-2.0-flash
-
-   # Si usas Ollama Local:
+   # Proveedor LLM: "dual" (Google + Ollama failover) | "google" | "ollama" | "mock"
+   LLM_PROVIDER=dual
+   GEMINI_API_KEY=tu_api_key_aqui
+   GEMINI_MODEL=gemini-3.5-flash-lite
    OLLAMA_BASE_URL=http://localhost:11434
    OLLAMA_MODEL=llama3.2
 
-   # Whisper STT
-   WHISPER_MODEL_SIZE=tiny
-   WHISPER_DEVICE=cpu
-   WHISPER_COMPUTE_TYPE=int8
+   # Supabase / PostgreSQL
+   SUPABASE_URL=https://tu-proyecto.supabase.co
+   SUPABASE_KEY=tu_service_key_aqui
+
+   # Variables Móviles (Expo)
+   EXPO_PUBLIC_BACKEND_URL=http://192.168.40.15:8000
+   EXPO_PUBLIC_TAILSCALE_IP=100.95.54.56
+   EXPO_PUBLIC_API_TOKEN=
+   EXPO_PUBLIC_BANK_WEBHOOK_SECRET=
    ```
 
 5. Inicia el servidor backend:
    ```powershell
-   .venv\Scripts\python.exe run.py
+   backend\.venv\Scripts\python.exe backend\run.py
    ```
    *El backend quedará escuchando en `http://0.0.0.0:8000` con recarga automática en caliente (`reload=True`).*
 

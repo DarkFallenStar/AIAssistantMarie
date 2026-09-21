@@ -91,12 +91,16 @@ class GoogleAIService(BaseLLMService):
                 "parts": [{"text": "\n\n".join(system_texts)}]
             }
 
-        endpoint_url = f"{self.BASE_URL}/{self._model}:generateContent?key={self._api_key}"
+        endpoint_url = f"{self.BASE_URL}/{self._model}:generateContent"
+        headers = {
+            "x-goog-api-key": self._api_key,
+            "Content-Type": "application/json"
+        }
         print(f"[GEMINI] Calling Google AI Studio for model '{self._model}' ({len(gemini_contents)} turns)...")
 
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
-                response = await client.post(endpoint_url, json=payload)
+                response = await client.post(endpoint_url, json=payload, headers=headers)
 
             if response.status_code != 200:
                 print(f"[GEMINI] HTTP {response.status_code} error: {response.text}")

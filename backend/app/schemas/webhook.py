@@ -1,11 +1,22 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Dict, Any
+from app.core.database import is_valid_uuid
 
 
 class BankWebhookPayload(BaseModel):
-    source: str = Field(..., example="bank", description="Origen de la notificación bancaria (ej: 'bank')")
-    content: str = Field(..., example="Compra realizada por $45.000 en Tienda D1 con tarjeta debito", description="Texto de la notificación")
+    source: str = Field(..., max_length=100, example="bank", description="Origen de la notificación bancaria (ej: 'bank')")
+    content: str = Field(..., max_length=2000, example="Compra realizada por $45.000 en Tienda D1 con tarjeta debito", description="Texto de la notificación")
     user_id: Optional[str] = Field(default=None, description="UUID del usuario receptor opcional")
+
+    @field_validator("user_id")
+    @classmethod
+    def validate_optional_uuid(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v.strip():
+            cleaned = v.strip()
+            if not is_valid_uuid(cleaned):
+                raise ValueError(f"user_id '{cleaned}' no es un UUID válido.")
+            return cleaned
+        return None
 
 
 class ExtractedBankTransaction(BaseModel):

@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Header, Depends
 from typing import Optional
 from app.schemas.webhook import BankWebhookPayload, BankWebhookResponse
 from app.services.webhook_extractor import BankWebhookExtractor
 from app.tools.transaction_tool import TransactionTools
 from app.core.config import settings
+from app.core.security import verify_bank_webhook_secret, verify_api_bearer_token
 
 router = APIRouter()
 _extractor_instance = BankWebhookExtractor()
@@ -31,7 +32,7 @@ def set_transaction_tools(tools: TransactionTools):
 @router.post("/bank", response_model=BankWebhookResponse, summary="Webhook de transacciones bancarias (Fase 14)")
 async def bank_webhook(
     payload: BankWebhookPayload,
-    x_webhook_secret: Optional[str] = Header(None)
+    _secret_valid: bool = Depends(verify_bank_webhook_secret)
 ):
     """
     Recibe notificaciones bancarias entrantes (compras, transferencias, débitos),
@@ -95,7 +96,8 @@ async def bank_webhook(
 @router.get("/bank/recent", summary="Consultar transacciones bancarias recientes procesadas por webhook")
 async def get_recent_bank_transactions(
     limit: int = 10,
-    user_id: Optional[str] = None
+    user_id: Optional[str] = None,
+    _authorized: bool = Depends(verify_api_bearer_token)
 ):
     """
     Retorna las transacciones registradas con source='webhook_bank' para

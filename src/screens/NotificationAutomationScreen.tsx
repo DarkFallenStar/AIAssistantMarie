@@ -413,6 +413,7 @@ export default function NotificationAutomationScreen({
                   • Método: <Text style={styles.bold}>POST</Text>{'\n'}
                   • URL: <Text style={styles.codeText}>{backendUrl}/webhooks/bank</Text>{'\n'}
                   • Content-Type: <Text style={styles.codeText}>application/json</Text>{'\n'}
+                  • Encabezado de seguridad (Fase 17): <Text style={styles.codeText}>X-Webhook-Secret: &lt;tu_secret_en_env&gt;</Text>{'\n'}
                   • Cuerpo de la solicitud:{'\n'}
                   <Text style={styles.codeBlock}>
                     {`{\n  "source": "macrodroid_android",\n  "content": "[notif_text]"\n}`}

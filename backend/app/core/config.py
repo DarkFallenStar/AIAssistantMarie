@@ -1,5 +1,14 @@
+from pathlib import Path
 from pydantic_settings import BaseSettings
 from typing import List
+
+_BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
+_ROOT_DIR = _BACKEND_DIR.parent
+_ENV_FILES = [
+    str(_BACKEND_DIR / ".env"),
+    str(_ROOT_DIR / ".env"),
+    ".env",
+]
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Personal Assistant AI Backend"
@@ -28,7 +37,8 @@ class Settings(BaseSettings):
     SUPABASE_KEY: str = ""
     DATABASE_URL: str = ""
     
-    # Bank Webhook Security
+    # Security and Authentication (Phase 17)
+    API_BEARER_TOKEN: str = ""
     BANK_WEBHOOK_SECRET: str = ""
     
     # Speech To Text (Whisper) Settings
@@ -44,7 +54,7 @@ class Settings(BaseSettings):
     IMAP_USE_SSL: bool = True
     
     class Config:
-        env_file = ".env"
+        env_file = _ENV_FILES
         case_sensitive = True
         extra = "ignore"
 

@@ -1,4 +1,5 @@
 import { File, UploadType } from 'expo-file-system';
+import { DEFAULT_API_TOKEN, DEFAULT_BANK_WEBHOOK_SECRET } from '../config';
 
 export interface HealthResponse {
   status: string;
@@ -58,10 +59,7 @@ export interface WebhookRecentTransaction {
   merchant?: string;
   category: string;
   type: string;
-  description?: string;
   transaction_date?: string;
-  source: string;
-  status?: string;
   metadata?: Record<string, any>;
 }
 
@@ -71,9 +69,42 @@ export interface WebhookRecentTransactionsResponse {
   transactions: WebhookRecentTransaction[];
 }
 
+// -----------------------------------------------------------------------------
+// Authentication and Security State (Phase 17)
+// -----------------------------------------------------------------------------
+let _activeApiToken: string = DEFAULT_API_TOKEN;
+let _activeWebhookSecret: string = DEFAULT_BANK_WEBHOOK_SECRET;
 
-export function normalizeUrl(url: string): string {
-  let clean = url.trim();
+export function setApiToken(token: string) {
+  _activeApiToken = (token || "").trim();
+}
+
+export function getApiToken(): string {
+  return _activeApiToken;
+}
+
+export function setWebhookSecret(secret: string) {
+  _activeWebhookSecret = (secret || "").trim();
+}
+
+export function getWebhookSecret(): string {
+  return _activeWebhookSecret;
+}
+
+export function getAuthHeaders(extraHeaders: Record<string, string> = {}): Record<string, string> {
+  const headers: Record<string, string> = { ...extraHeaders };
+  const token = getApiToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+/**
+ * Normalizes backend URL ensuring protocol and removing trailing slashes.
+ */
+export function normalizeUrl(rawUrl: string): string {
+  let clean = rawUrl.trim();
   if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
     clean = `http://${clean}`;
   }
@@ -82,7 +113,7 @@ export function normalizeUrl(url: string): string {
 
 /**
  * Checks connectivity with the FastAPI backend health endpoint (GET /health).
- * Measures response round-trip latency.
+ * Measures response round-trip latency. (Public endpoint, no auth required).
  */
 export async function checkBackendHealth(
   baseUrl: string,
@@ -141,9 +172,9 @@ export async function checkDatabaseStatus(
   try {
     const response = await fetch(url, {
       method: "GET",
-      headers: {
+      headers: getAuthHeaders({
         Accept: "application/json",
-      },
+      }),
       signal: controller.signal,
     });
 
@@ -184,10 +215,10 @@ export async function sendChatMessage(
   try {
     const response = await fetch(url, {
       method: "POST",
-      headers: {
+      headers: getAuthHeaders({
         "Content-Type": "application/json",
         Accept: "application/json",
-      },
+      }),
       body: JSON.stringify({ message }),
       signal: controller.signal,
     });
@@ -216,7 +247,6 @@ export async function sendChatMessage(
   }
 }
 
-
 export interface VoiceResponse {
   status: string;
   filename: string;
@@ -244,10 +274,10 @@ export async function requestTTS(
   try {
     const res = await fetch(url, {
       method: "POST",
-      headers: {
+      headers: getAuthHeaders({
         "Content-Type": "application/json",
         Accept: "application/json",
-      },
+      }),
       body: JSON.stringify({ text }),
       signal: controller.signal,
     });
@@ -279,6 +309,7 @@ export async function sendAudioRecording(
       httpMethod: 'POST',
       uploadType: UploadType.MULTIPART,
       mimeType: 'audio/m4a',
+      headers: getAuthHeaders(),
     });
 
     if (uploadResult.status < 200 || uploadResult.status >= 300) {
@@ -303,19 +334,26 @@ export async function sendAudioRecording(
 export async function sendBankWebhook(
   baseUrl: string,
   payload: BankWebhookPayload,
+  webhookSecret?: string,
   timeoutMs: number = 25000
 ): Promise<BankWebhookResponse> {
   const url = `${normalizeUrl(baseUrl)}/webhooks/bank`;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
+  const activeSecret = (webhookSecret || getWebhookSecret() || "").trim();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  };
+  if (activeSecret) {
+    headers['X-Webhook-Secret'] = activeSecret;
+  }
+
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
+      headers,
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
@@ -355,9 +393,9 @@ export async function getRecentWebhookTransactions(
   try {
     const res = await fetch(url, {
       method: 'GET',
-      headers: {
+      headers: getAuthHeaders({
         Accept: 'application/json',
-      },
+      }),
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
@@ -380,4 +418,3 @@ export async function getRecentWebhookTransactions(
     throw new Error(err.message || 'Error al obtener transacciones del webhook');
   }
 }
-

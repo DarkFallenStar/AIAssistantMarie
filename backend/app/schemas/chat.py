@@ -1,8 +1,22 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any
 
 class ChatRequest(BaseModel):
-    message: str = Field(..., example="Hola", description="Mensaje enviado por el usuario")
+    message: str = Field(
+        ...,
+        min_length=1,
+        max_length=4096,
+        example="Hola",
+        description="Mensaje enviado por el usuario"
+    )
+
+    @field_validator("message")
+    @classmethod
+    def validate_message(cls, v: str) -> str:
+        cleaned = v.strip()
+        if not cleaned:
+            raise ValueError("El mensaje no puede estar vacío ni contener solo espacios en blanco.")
+        return cleaned
 
 class ChatResponse(BaseModel):
     response: str = Field(..., example="Hola, soy tu asistente.", description="Respuesta del asistente")
