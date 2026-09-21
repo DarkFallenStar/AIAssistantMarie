@@ -1,12 +1,18 @@
 from fastapi import APIRouter
 from app.schemas.chat import ChatRequest, ChatResponse
+from app.agents.orchestrator import get_orchestrator_service
 
 router = APIRouter()
 
-@router.post("/chat", response_model=ChatResponse, summary="Chat Básico (Fase 2)")
+@router.post("/chat", response_model=ChatResponse, summary="Chat con Asistente / Orquestador Multi-Agente")
 async def chat(payload: ChatRequest):
     """
-    Endpoint inicial de chat para validar la comunicación móvil ↔ backend.
-    En esta fase responde de forma estática antes de integrar los agentes LLM.
+    Endpoint principal de chat. Conecta la solicitud al Orquestador y a la capa desacoplada de LLM.
     """
-    return ChatResponse(response="Hola, soy tu asistente.")
+    orchestrator = get_orchestrator_service()
+    result = await orchestrator.process_user_input(payload.message, use_llm=True)
+    return ChatResponse(
+        response=result.response,
+        intent=result.intent,
+        agent=result.agent
+    )
