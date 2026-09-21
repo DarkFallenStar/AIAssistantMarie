@@ -104,20 +104,27 @@ class FinancialAgent(BaseAgent):
         # -----------------------------------------------------------------
         # A. Create transaction
         if any(kw in req_lower for kw in ["registra un gasto", "agrega un gasto", "anota un gasto", "nuevo gasto", "compre", "compré", "gaste", "gasté", "registra una transaccion", "registra una transacción"]):
-            amt_match = re.search(r'(?:\$|de\s+)?([0-9]+(?:[.,][0-9]{1,2})?)\s*(?:dolares|dólares|usd|\$)?', request, re.IGNORECASE)
-            amount = float(amt_match.group(1).replace(",", ".")) if amt_match else 20.0
+            amt_match = re.search(r'(?:\$|de\s+)?([0-9]+(?:[.,][0-9]{1,2})?)\s*(?:pesos|cop|dolares|dólares|usd|\$)?', request, re.IGNORECASE)
+            amount = float(amt_match.group(1).replace(",", ".")) if amt_match else 20000.0
+            currency = "USD" if any(w in req_lower for w in ["dolar", "dólar", "usd"]) else "COP"
 
-            # Extract category / description
-            cat_match = re.search(r'(?:en|para|de)\s+([a-zA-ZáéíóúÁÉÍÓÚñÑ_ -]+)', request)
+            # Extract category / description strictly after 'en' or 'para' first
+            cat_match = re.search(r'\b(?:en|para)\s+([a-zA-ZáéíóúÁÉÍÓÚñÑ_ -]+)', request, re.IGNORECASE)
+            if not cat_match:
+                cat_match = re.search(r'\b(?:de)\s+(?:[0-9]+(?:[.,][0-9]+)?\s*(?:pesos|cop|dolares|usd|\$)?\s*(?:en|para)?\s*)?([a-zA-ZáéíóúÁÉÍÓÚñÑ_ -]+)', request, re.IGNORECASE)
+
             category = cat_match.group(1).strip().lower() if cat_match else "general"
             # Strip noise words
-            category = re.sub(r'^(?:dolares|dólares|usd|\$)\s*', '', category).strip()
+            category = re.sub(r'^(?:dolares|dólares|usd|pesos|cop|\$|[0-9]+)\s*', '', category).strip()
+            if not category:
+                category = "general"
 
             tools_to_run.append(("transaction_tool", {
                 "action": "create",
                 "amount": amount,
                 "type": "expense",
                 "category": category,
+                "currency": currency,
                 "description": f"Gasto registrado: {category}",
                 "merchant": category.capitalize()
             }))
@@ -133,9 +140,9 @@ class FinancialAgent(BaseAgent):
                 "category": new_cat
             }))
         # C. Query Transactions
-        elif any(kw in req_lower for kw in ["movimientos", "transacciones", "ultimos gastos", "últimos gastos", "historial", "en que gaste", "en qué gasté"]):
+        elif any(kw in req_lower for kw in ["movimientos", "transacciones", "ultimos gastos", "últimos gastos", "historial", "en que gaste", "en qué gasté", "gastado en", "gasto en", "gastos en"]):
             cat_filter = None
-            for cat in ["supermercado", "alimentos", "comida", "transporte", "gasolina", "farmacia"]:
+            for cat in ["supermercado", "alimentos", "comida", "alimentacion", "alimentación", "transporte", "gasolina", "farmacia", "educacion", "educación", "ocio", "servicios"]:
                 if cat in req_lower:
                     cat_filter = cat
                     break

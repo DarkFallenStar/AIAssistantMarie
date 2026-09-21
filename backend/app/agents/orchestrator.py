@@ -35,7 +35,7 @@ AGENTES DISPONIBLES:
    - Herramientas disponibles:
      * "calculate_cash_flow": Calcula saldo neto y flujo de caja del mes. Argumentos: {"period": "current_month"}
      * "list_transactions": Consulta transacciones o movimientos recientes. Argumentos: {"category": null o string, "limit": 5}
-     * "create_transaction": Registra un nuevo gasto o ingreso. Argumentos: {"amount": float, "type": "expense" | "income", "category": str, "description": str, "merchant": str}
+     * "create_transaction": Registra un nuevo gasto o ingreso. Argumentos: {"amount": float, "type": "expense" | "income", "category": str, "description": str, "merchant": str, "currency": "COP" | "USD"}
      * "categorize_transaction": Modifica la categoría de una transacción. Argumentos: {"transaction_id": str, "category": str}
      * "list_credit_cards": Consulta tarjetas de crédito y saldo disponible. Argumentos: {}
      * "list_loans": Consulta préstamos, cuotas y deudas activas. Argumentos: {}

@@ -11,17 +11,18 @@ class TransactionTools(BaseTool):
     """
 
     MOCK_TRANSACTIONS: List[Dict[str, Any]] = [
+        # Alimentación
         {
             "id": "10000000-0000-0000-0000-000000000001",
             "account_id": "d0000000-0000-0000-0000-000000000001",
             "credit_card_id": None,
             "type": "expense",
-            "amount": 45.00,
-            "currency": "USD",
-            "category": "supermercado",
-            "description": "Compra de despensa semanal",
-            "merchant": "Walmart Supercenter",
-            "transaction_date": "2026-09-20T12:00:00Z",
+            "amount": 85000.00,
+            "currency": "COP",
+            "category": "alimentacion",
+            "description": "Compra de despensa semanal en supermercado",
+            "merchant": "Supermercado Éxito",
+            "transaction_date": "2026-09-21T10:00:00Z",
             "status": "posted",
             "source": "manual"
         },
@@ -30,25 +31,142 @@ class TransactionTools(BaseTool):
             "account_id": "d0000000-0000-0000-0000-000000000001",
             "credit_card_id": None,
             "type": "expense",
-            "amount": 35.00,
-            "currency": "USD",
+            "amount": 32000.00,
+            "currency": "COP",
+            "category": "alimentacion",
+            "description": "Almuerzo ejecutivo en restaurante",
+            "merchant": "Restaurante Central",
+            "transaction_date": "2026-09-20T13:30:00Z",
+            "status": "posted",
+            "source": "manual"
+        },
+        # Transporte
+        {
+            "id": "10000000-0000-0000-0000-000000000003",
+            "account_id": "d0000000-0000-0000-0000-000000000001",
+            "credit_card_id": None,
+            "type": "expense",
+            "amount": 45000.00,
+            "currency": "COP",
             "category": "transporte",
-            "description": "Carga de combustible",
-            "merchant": "Gasolinera Express",
+            "description": "Tanqueo de gasolina en estación de servicio",
+            "merchant": "Estación Terpel",
             "transaction_date": "2026-09-19T17:30:00Z",
             "status": "posted",
             "source": "manual"
         },
         {
-            "id": "10000000-0000-0000-0000-000000000003",
+            "id": "10000000-0000-0000-0000-000000000004",
+            "account_id": "d0000000-0000-0000-0000-000000000001",
+            "credit_card_id": None,
+            "type": "expense",
+            "amount": 18500.00,
+            "currency": "COP",
+            "category": "transporte",
+            "description": "Viaje en taxi hacia la oficina",
+            "merchant": "Taxi Urbano",
+            "transaction_date": "2026-09-19T08:15:00Z",
+            "status": "posted",
+            "source": "manual"
+        },
+        # Educación
+        {
+            "id": "10000000-0000-0000-0000-000000000005",
+            "account_id": "d0000000-0000-0000-0000-000000000001",
+            "credit_card_id": None,
+            "type": "expense",
+            "amount": 120000.00,
+            "currency": "COP",
+            "category": "educacion",
+            "description": "Pago de curso online y certificación técnica",
+            "merchant": "Plataforma Educativa",
+            "transaction_date": "2026-09-18T11:00:00Z",
+            "status": "posted",
+            "source": "manual"
+        },
+        {
+            "id": "10000000-0000-0000-0000-000000000006",
+            "account_id": "d0000000-0000-0000-0000-000000000001",
+            "credit_card_id": None,
+            "type": "expense",
+            "amount": 45000.00,
+            "currency": "COP",
+            "category": "educacion",
+            "description": "Compra de libros y materiales de estudio",
+            "merchant": "Librería Nacional",
+            "transaction_date": "2026-09-17T16:20:00Z",
+            "status": "posted",
+            "source": "manual"
+        },
+        # Ocio
+        {
+            "id": "10000000-0000-0000-0000-000000000007",
+            "account_id": "d0000000-0000-0000-0000-000000000001",
+            "credit_card_id": None,
+            "type": "expense",
+            "amount": 55000.00,
+            "currency": "COP",
+            "category": "ocio",
+            "description": "Entradas de cine y combo de alimentos",
+            "merchant": "Cine Colombia",
+            "transaction_date": "2026-09-16T20:00:00Z",
+            "status": "posted",
+            "source": "manual"
+        },
+        {
+            "id": "10000000-0000-0000-0000-000000000008",
+            "account_id": "d0000000-0000-0000-0000-000000000001",
+            "credit_card_id": None,
+            "type": "expense",
+            "amount": 28000.00,
+            "currency": "COP",
+            "category": "ocio",
+            "description": "Suscripción mensual de entretenimiento",
+            "merchant": "Streaming Plus",
+            "transaction_date": "2026-09-16T10:00:00Z",
+            "status": "posted",
+            "source": "manual"
+        },
+        # Servicios
+        {
+            "id": "10000000-0000-0000-0000-000000000009",
+            "account_id": "d0000000-0000-0000-0000-000000000001",
+            "credit_card_id": None,
+            "type": "expense",
+            "amount": 95000.00,
+            "currency": "COP",
+            "category": "servicios",
+            "description": "Factura de servicio de energía eléctrica",
+            "merchant": "Empresa de Energía",
+            "transaction_date": "2026-09-15T14:00:00Z",
+            "status": "posted",
+            "source": "manual"
+        },
+        {
+            "id": "10000000-0000-0000-0000-000000000010",
+            "account_id": "d0000000-0000-0000-0000-000000000001",
+            "credit_card_id": None,
+            "type": "expense",
+            "amount": 75000.00,
+            "currency": "COP",
+            "category": "servicios",
+            "description": "Pago de plan de internet de fibra óptica",
+            "merchant": "Claro Hogar",
+            "transaction_date": "2026-09-15T15:00:00Z",
+            "status": "posted",
+            "source": "manual"
+        },
+        # Ingreso
+        {
+            "id": "10000000-0000-0000-0000-000000000011",
             "account_id": "d0000000-0000-0000-0000-000000000001",
             "credit_card_id": None,
             "type": "income",
-            "amount": 1600.00,
-            "currency": "USD",
+            "amount": 2500000.00,
+            "currency": "COP",
             "category": "ingreso",
             "description": "Transferencia Recibida (Nómina quincenal)",
-            "merchant": "Empleador Tech Corp",
+            "merchant": "Empresa Empleadora",
             "transaction_date": "2026-09-15T09:00:00Z",
             "status": "posted",
             "source": "manual"
@@ -147,7 +265,7 @@ class TransactionTools(BaseTool):
         account_id: Optional[str] = None,
         credit_card_id: Optional[str] = None,
         user_id: Optional[str] = None,
-        currency: str = "USD",
+        currency: str = "COP",
         source: str = "voice_agent",
         transaction_date: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None
@@ -167,7 +285,7 @@ class TransactionTools(BaseTool):
             "credit_card_id": credit_card_id,
             "type": type.lower() if type in ["income", "expense", "transfer"] else "expense",
             "amount": clean_amount,
-            "currency": (currency or "USD").upper(),
+            "currency": (currency or "COP").upper(),
             "category": (category or "general").strip().lower(),
             "description": description or f"Movimiento {type}",
             "merchant": merchant or description or "Comercio",
@@ -187,10 +305,11 @@ class TransactionTools(BaseTool):
             except Exception as exc:
                 print(f"[TOOL] Supabase create_transaction failed ({exc}), stored in mock storage")
 
+        formatted_amount = f"${clean_amount:,.0f}" if payload['currency'] == "COP" else f"${clean_amount:.2f}"
         return ToolResult(
             success=True,
             data=payload,
-            message=f"Transacción de ${clean_amount:.2f} {payload['currency']} ({payload['type']}) en '{payload['category']}' registrada correctamente."
+            message=f"Transacción de {formatted_amount} {payload['currency']} ({payload['type']}) en '{payload['category']}' registrada correctamente."
         )
 
     async def categorize_transaction(
@@ -268,6 +387,7 @@ class TransactionTools(BaseTool):
                 category=category or kwargs.get("categoria", "general"),
                 description=description or kwargs.get("descripcion", ""),
                 merchant=merchant,
+                currency=kwargs.get("currency", "COP"),
                 user_id=user_id
             )
 

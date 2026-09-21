@@ -11,18 +11,18 @@ class CashFlowTools(BaseTool):
     MOCK_ACCOUNTS: List[Dict[str, Any]] = [
         {
             "id": "d0000000-0000-0000-0000-000000000001",
-            "name": "Cuenta Corriente Principal",
-            "institution": "BBVA",
-            "balance": 2450.75,
-            "currency": "USD"
+            "name": "Cuenta de Ahorros Principal",
+            "institution": "Bancolombia",
+            "balance": 3500000.00,
+            "currency": "COP"
         }
     ]
 
     MOCK_MONTHLY_SUMMARY = {
-        "monthly_income": 1600.00,
-        "monthly_expenses": 80.00,
-        "committed_fixed_expenses": 650.00,
-        "emergency_reserved": 300.00
+        "monthly_income": 2500000.00,
+        "monthly_expenses": 618500.00,
+        "committed_fixed_expenses": 350000.00,
+        "emergency_reserved": 500000.00
     }
 
     @property
@@ -100,12 +100,23 @@ class CashFlowTools(BaseTool):
 
         total_liquid = sum(a["balance"] for a in accounts)
         net_cash_flow = total_income - total_expenses
-        available_discretionary = max(0.0, total_liquid - 500.00)  # reserved safety margin
+        reserve_margin = 50000.0 if any(a.get("currency") == "COP" for a in accounts) else 50.0
+        available_discretionary = max(0.0, total_liquid - reserve_margin)
+
+        # Detect currency from accounts
+        currency = "COP" if any(a.get("currency") == "COP" for a in accounts) else "USD"
+        if accounts and accounts[0].get("currency"):
+            currency = accounts[0]["currency"]
+
+        fmt_liquid = f"${total_liquid:,.0f}" if currency == "COP" else f"${total_liquid:,.2f}"
+        fmt_income = f"${total_income:,.0f}" if currency == "COP" else f"${total_income:,.2f}"
+        fmt_expenses = f"${total_expenses:,.0f}" if currency == "COP" else f"${total_expenses:,.2f}"
+        fmt_net = f"${net_cash_flow:,.0f}" if currency == "COP" else f"${net_cash_flow:,.2f}"
 
         data = {
             "period": period,
             "total_liquid_balance": round(total_liquid, 2),
-            "currency": "USD",
+            "currency": currency,
             "monthly_income": round(total_income, 2),
             "monthly_expenses": round(total_expenses, 2),
             "net_cash_flow": round(net_cash_flow, 2),
@@ -118,9 +129,9 @@ class CashFlowTools(BaseTool):
             success=True,
             data=data,
             message=(
-                f"Flujo de caja ({period}): Balance total en cuentas: ${total_liquid:.2f} USD. "
-                f"Ingresos: ${total_income:.2f} USD, Gastos: ${total_expenses:.2f} USD, "
-                f"Flujo neto: ${net_cash_flow:.2f} USD."
+                f"Flujo de caja ({period}): Balance total en cuentas: {fmt_liquid} {currency}. "
+                f"Ingresos: {fmt_income} {currency}, Gastos: {fmt_expenses} {currency}, "
+                f"Flujo neto: {fmt_net} {currency}."
             )
         )
 

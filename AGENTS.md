@@ -210,9 +210,9 @@ SECRETARY AGENT       FINANCIAL AGENT           OTHER AGENTS...
 
 ### M. Full System Testing & Verification Playbook (Fase 20 Readiness)
 1. **Automated Suite Baseline**:
-   - Backend: 166 unit/integration tests (`& "backend/.venv/Scripts/python.exe" -m unittest discover -s tests -p "test_*.py" -v` in `backend/`).
+   - Backend: 178 unit/integration tests (`& "backend/.venv/Scripts/python.exe" -m unittest discover -s tests -p "test_*.py" -v` in `backend/`).
    - Mobile: 10 state-machine/logic unit tests (`node --test tests/mobile/test_mobile_assistant.test.mjs`).
-   - Total: 176 automated tests passing at 100% green.
+   - Total: 188 automated tests passing at 100% green.
 2. **Network Topology & Verified IPs**:
    - Local Wi-Fi (LAN): `192.168.40.15:8000`
    - Tailscale (Encrypted Mesh VPN): `100.95.54.56:8000`
@@ -225,3 +225,11 @@ SECRETARY AGENT       FINANCIAL AGENT           OTHER AGENTS...
    - Step 5: Financial Test -> Hold Mic button or type: "¿Cuánto dinero tengo disponible este mes?". Verify cash flow calculation.
    - Step 6: Bank Notification Simulation -> In mobile app, tap "Centro de Notificaciones Bancarias" -> tap "Bancolombia ($45.000 COP)". Verify transaction receipt, then ask assistant for recent expenses.
    - Step 7: Compound Intent Test -> Submit: "Anota comprar repuestos y dime cuánto saldo me queda". Verify sequential multi-agent orchestration.
+
+### N. MVP Core Stabilization & Mandatory 12 Tests
+1. **Task Title Matching Resolution**:
+   - `TaskTools.update_task` and `complete_task` support task lookup by natural title (e.g. *"entregar proyecto"*) via Supabase `.ilike("title", f"%{task_id}%")` and in-memory substring matching, preventing failure when callers pass task titles instead of UUIDs.
+2. **Native Colombian Peso (COP) Currency**:
+   - `TransactionTools`, `CashFlowTools`, `FinancialAgent`, and `ToolDispatcher` default to `"COP"`. Currency formats with whole thousands notation (`$20,000 COP`) when operating in COP.
+3. **MVP 12 Mandatory Test Suite**:
+   - `backend/tests/test_mvp_12_flows.py` verifies all 12 core acceptance tests from the MVP specification end-to-end (Health, Secretary Tasks, Task Creation, Task Completion, Financial Monthly Expenses, Financial COP Transaction Creation, Bank Webhook Ingestion, Financial Ingestion Verification, Whisper Audio STT, Tailscale Remote Probe, Controlled Out-of-Domain Response, and Backend Error Recovery).

@@ -54,6 +54,7 @@ class ToolDispatcher:
             category = args.get("category", "general")
             description = args.get("description", f"Registro de {category}")
             merchant = args.get("merchant", category.capitalize())
+            currency = args.get("currency", "COP")
             return await self.transaction_tool.execute(
                 action="create",
                 account_id=args.get("account_id"),
@@ -61,7 +62,8 @@ class ToolDispatcher:
                 type=tx_type,
                 category=category,
                 description=description,
-                merchant=merchant
+                merchant=merchant,
+                currency=currency
             )
 
         elif normalized in ["categorize_transaction", "update_transaction_category"]:
@@ -117,9 +119,11 @@ class ToolDispatcher:
             )
 
         elif normalized in ["complete_task"]:
+            target_task = args.get("task_id") or args.get("title") or args.get("name") or args.get("id")
             return await self.task_tool.execute(
                 action="complete",
-                task_id=args.get("task_id")
+                task_id=target_task,
+                title=target_task
             )
 
         elif normalized in ["list_reminders", "get_reminders"]:

@@ -30,6 +30,26 @@ class TaskTools(BaseTool):
             "category": "general",
             "due_date": "Hoy, 6:00 p.m.",
             "completed_at": None
+        },
+        {
+            "id": "b0000000-0000-0000-0000-000000000001",
+            "title": "Revisar presupuesto mensual",
+            "description": "Analizar los gastos de la semana con el Asistente Financiero",
+            "status": "pending",
+            "priority": "high",
+            "category": "finanzas",
+            "due_date": "Mañana, 9:00 a.m.",
+            "completed_at": None
+        },
+        {
+            "id": "b0000000-0000-0000-0000-000000000002",
+            "title": "Entregar informe de avance de tesis",
+            "description": "Enviar borrador del capítulo metodológico al director de tesis",
+            "status": "pending",
+            "priority": "high",
+            "category": "academico",
+            "due_date": "Viernes, 5:00 p.m.",
+            "completed_at": None
         }
     ]
 
@@ -171,24 +191,51 @@ class TaskTools(BaseTool):
             )
 
         client = get_supabase_client()
-        if client and is_valid_uuid(task_id):
-            try:
-                query = client.table("tasks").update(updates).eq("id", task_id)
-                if user_id:
-                    query = query.eq("user_id", user_id)
-                res = query.execute()
-                if res and res.data:
-                    return ToolResult(
-                        success=True,
-                        data=res.data[0],
-                        message=f"Tarea '{task_id}' actualizada exitosamente."
-                    )
-            except Exception as exc:
-                print(f"[TOOL] Supabase update_task failed ({exc}), updating in mock fallback")
+        if client:
+            if is_valid_uuid(task_id):
+                try:
+                    query = client.table("tasks").update(updates).eq("id", task_id)
+                    if user_id:
+                        query = query.eq("user_id", user_id)
+                    res = query.execute()
+                    if res and res.data:
+                        return ToolResult(
+                            success=True,
+                            data=res.data[0],
+                            message=f"Tarea '{task_id}' actualizada exitosamente."
+                        )
+                except Exception as exc:
+                    print(f"[TOOL] Supabase update_task by UUID failed ({exc}), updating in mock fallback")
+            else:
+                # Search by title in Supabase using case-insensitive match
+                try:
+                    clean_search = task_id.strip()
+                    query = client.table("tasks").select("*").ilike("title", f"%{clean_search}%").order("created_at", desc=True).limit(1)
+                    if user_id:
+                        query = query.eq("user_id", user_id)
+                    search_res = query.execute()
+                    if search_res and search_res.data:
+                        real_id = search_res.data[0]["id"]
+                        upd_res = client.table("tasks").update(updates).eq("id", real_id).execute()
+                        if upd_res and upd_res.data:
+                            task_title = search_res.data[0].get("title", task_id)
+                            # Also reflect in in-memory list
+                            for t in self._tasks:
+                                if t.get("id") == real_id or t.get("title", "").lower() == task_title.lower():
+                                    t.update(updates)
+                            return ToolResult(
+                                success=True,
+                                data=upd_res.data[0],
+                                message=f"Tarea '{task_title}' marcada como completada exitosamente."
+                            )
+                except Exception as exc:
+                    print(f"[TOOL] Supabase update_task by title search failed ({exc}), trying mock fallback")
 
-        # In-memory fallback
+        # In-memory fallback with exact and substring matching
+        target_clean = task_id.lower().strip()
         for t in self._tasks:
-            if t.get("id") == task_id or t.get("title", "").lower() == task_id.lower():
+            t_title = t.get("title", "").lower()
+            if t.get("id") == task_id or t_title == target_clean or (target_clean and target_clean in t_title) or (t_title and t_title in target_clean):
                 t.update(updates)
                 return ToolResult(
                     success=True,
@@ -199,7 +246,7 @@ class TaskTools(BaseTool):
         return ToolResult(
             success=False,
             data=None,
-            message=f"No se encontró la tarea con id '{task_id}'."
+            message=f"No se encontró la tarea con identificador o título '{task_id}'."
         )
 
     async def complete_task(
