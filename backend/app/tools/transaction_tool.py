@@ -222,31 +222,41 @@ class TransactionTools(BaseTool):
             except Exception as exc:
                 print(f"[TOOL] Supabase get_transactions failed ({exc}), using mock fallback")
 
-        # Supplement with in-memory transactions: prioritize newly created transactions in current session
+        # Strict persistence priority:
+        # If database records are present, database is the Single Source of Truth.
+        default_mock_ids = {t.get("id") for t in self.MOCK_TRANSACTIONS}
         seen_ids = set()
         combined: List[Dict[str, Any]] = []
 
-        # 1. Local session transactions first
-        for t in self._transactions:
-            t_id = t.get("id")
-            if t_id and t_id not in seen_ids:
-                seen_ids.add(t_id)
-                matches_cat = not category or category.lower() in t.get("category", "").lower()
-                matches_type = not type or t.get("type", "").lower() == type.lower()
-                matches_source = not source or t.get("source", "").lower() == source.lower()
-                if matches_cat and matches_type and matches_source:
-                    combined.append(t)
+        if transactions:
+            # 1. Any newly created session transaction that isn't a static mock and isn't yet in DB query
+            for t in self._transactions:
+                t_id = t.get("id")
+                if t_id and t_id not in default_mock_ids and t_id not in seen_ids:
+                    seen_ids.add(t_id)
+                    matches_cat = not category or category.lower() in t.get("category", "").lower()
+                    matches_type = not type or t.get("type", "").lower() == type.lower()
+                    matches_source = not source or t.get("source", "").lower() == source.lower()
+                    if matches_cat and matches_type and matches_source:
+                        combined.append(t)
 
-        # 2. Remote database records
-        for t in transactions:
-            t_id = t.get("id")
-            if t_id and t_id not in seen_ids:
-                seen_ids.add(t_id)
-                matches_cat = not category or category.lower() in t.get("category", "").lower()
-                matches_type = not type or t.get("type", "").lower() == type.lower()
-                matches_source = not source or t.get("source", "").lower() == source.lower()
-                if matches_cat and matches_type and matches_source:
+            # 2. Add database records
+            for t in transactions:
+                t_id = t.get("id")
+                if t_id and t_id not in seen_ids:
+                    seen_ids.add(t_id)
                     combined.append(t)
+        else:
+            # Fallback when database is unreachable or offline
+            for t in self._transactions:
+                t_id = t.get("id")
+                if t_id and t_id not in seen_ids:
+                    seen_ids.add(t_id)
+                    matches_cat = not category or category.lower() in t.get("category", "").lower()
+                    matches_type = not type or t.get("type", "").lower() == type.lower()
+                    matches_source = not source or t.get("source", "").lower() == source.lower()
+                    if matches_cat and matches_type and matches_source:
+                        combined.append(t)
 
         filtered = combined[:limit]
         return ToolResult(
@@ -361,6 +371,47 @@ class TransactionTools(BaseTool):
             message=f"No se encontró ninguna transacción con el ID '{transaction_id}'."
         )
 
+    async def delete_transaction(
+        self,
+        transaction_id: str,
+        user_id: Optional[str] = None
+    ) -> ToolResult:
+        """
+        Deletes a transaction from Supabase and in-memory fallback.
+        """
+        client = get_supabase_client()
+        if client and is_valid_uuid(transaction_id):
+            try:
+                query = client.table("transactions").delete().eq("id", transaction_id)
+                if user_id:
+                    query = query.eq("user_id", user_id)
+                query.execute()
+                self._transactions = [t for t in self._transactions if t.get("id") != transaction_id]
+                TransactionTools._shared_transactions = self._transactions
+                return ToolResult(
+                    success=True,
+                    data={"deleted_id": transaction_id},
+                    message=f"Transacción '{transaction_id}' eliminada exitosamente de la base de datos."
+                )
+            except Exception as exc:
+                print(f"[TOOL] Supabase delete_transaction failed ({exc}), deleting from mock")
+
+        # In-memory fallback
+        initial_len = len(self._transactions)
+        self._transactions = [t for t in self._transactions if t.get("id") != transaction_id]
+        TransactionTools._shared_transactions = self._transactions
+        if len(self._transactions) < initial_len:
+            return ToolResult(
+                success=True,
+                data={"deleted_id": transaction_id},
+                message=f"Transacción '{transaction_id}' eliminada correctamente."
+            )
+        return ToolResult(
+            success=False,
+            data=None,
+            message=f"No se encontró ninguna transacción con el ID '{transaction_id}'."
+        )
+
     async def execute(
         self,
         action: str = "list",
@@ -397,6 +448,12 @@ class TransactionTools(BaseTool):
             if not tx_id:
                 return ToolResult(success=False, data=None, message="Se requiere el ID de la transacción para categorizarla.")
             return await self.categorize_transaction(transaction_id=tx_id, category=cat, user_id=user_id)
+
+        if action in ["delete", "remove", "eliminar", "borrar"]:
+            tx_id = transaction_id or kwargs.get("id")
+            if not tx_id:
+                return ToolResult(success=False, data=None, message="Se requiere el ID de la transacción para eliminarla.")
+            return await self.delete_transaction(transaction_id=tx_id, user_id=user_id)
 
         # Default is list/get
         return await self.get_transactions(limit=limit, category=category, type=type, user_id=user_id)

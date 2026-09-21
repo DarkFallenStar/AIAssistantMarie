@@ -233,3 +233,14 @@ SECRETARY AGENT       FINANCIAL AGENT           OTHER AGENTS...
    - `TransactionTools`, `CashFlowTools`, `FinancialAgent`, and `ToolDispatcher` default to `"COP"`. Currency formats with whole thousands notation (`$20,000 COP`) when operating in COP.
 3. **MVP 12 Mandatory Test Suite**:
    - `backend/tests/test_mvp_12_flows.py` verifies all 12 core acceptance tests from the MVP specification end-to-end (Health, Secretary Tasks, Task Creation, Task Completion, Financial Monthly Expenses, Financial COP Transaction Creation, Bank Webhook Ingestion, Financial Ingestion Verification, Whisper Audio STT, Tailscale Remote Probe, Controlled Out-of-Domain Response, and Backend Error Recovery).
+
+### O. Real Database Persistence & Full CRUD Lifecycle
+1. **Database as Single Source of Truth**:
+   - `TransactionTools.get_transactions()`, `TaskTools.list_tasks()`, and `MockEmailClient.list_all()` strictly prioritize database records when connected to Supabase PostgreSQL. Hardcoded mock arrays are never injected ahead of real records or allowed to obscure database queries upon backend process restart.
+2. **Full CRUD Deletion**:
+   - `TaskTools.delete_task()` supports deletion by UUID and case-insensitive natural title search.
+   - `TransactionTools.delete_transaction()` supports deletion by transaction UUID.
+   - Both operations are routed in `ToolDispatcher`, supported in `FUNCTION_CALLING_SYSTEM_PROMPT`, and handled in agent intent heuristics.
+3. **Restart Persistence Validation**:
+   - `backend/tests/test_database_persistence.py` verifies end-to-end that created tasks and transactions survive simulated process restarts, update state, and are cleanly purged upon deletion. Total automated baseline: 191 tests passing (181 backend + 10 mobile).
+

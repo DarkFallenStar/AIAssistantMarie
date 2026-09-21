@@ -141,15 +141,41 @@ class TaskTools(BaseTool):
             except Exception as exc:
                 print(f"[TOOL] Supabase list_tasks failed ({exc}), using mock fallback")
 
-        # Supplement with in-memory tasks so demo/test tasks are always present
-        seen_ids = {t.get("id") for t in tasks}
-        for t in self._tasks:
-            if t.get("id") not in seen_ids:
-                if (not status or t.get("status", "").lower() == status.lower()) and \
-                   (not priority or t.get("priority", "").lower() == priority.lower()):
-                    tasks.append(t)
+        # Strict persistence priority:
+        # If database records are present, database is the Single Source of Truth.
+        default_mock_ids = {t["id"] for t in self.MOCK_TASKS}
+        seen_ids = set()
+        combined: List[Dict[str, Any]] = []
 
-        filtered = tasks[:limit]
+        if tasks:
+            # 1. Any newly created session task that isn't a static mock and isn't yet in DB query
+            for t in self._tasks:
+                t_id = t.get("id")
+                if t_id and t_id not in default_mock_ids and t_id not in seen_ids:
+                    seen_ids.add(t_id)
+                    matches_status = not status or t.get("status", "").lower() == status.lower()
+                    matches_prio = not priority or t.get("priority", "").lower() == priority.lower()
+                    if matches_status and matches_prio:
+                        combined.append(t)
+
+            # 2. Add database records
+            for t in tasks:
+                t_id = t.get("id")
+                if t_id and t_id not in seen_ids:
+                    seen_ids.add(t_id)
+                    combined.append(t)
+        else:
+            # Fallback when database is unreachable or offline
+            for t in self._tasks:
+                t_id = t.get("id")
+                if t_id and t_id not in seen_ids:
+                    seen_ids.add(t_id)
+                    matches_status = not status or t.get("status", "").lower() == status.lower()
+                    matches_prio = not priority or t.get("priority", "").lower() == priority.lower()
+                    if matches_status and matches_prio:
+                        combined.append(t)
+
+        filtered = combined[:limit]
         return ToolResult(
             success=True,
             data={"count": len(filtered), "tasks": filtered},
@@ -263,6 +289,83 @@ class TaskTools(BaseTool):
             user_id=user_id
         )
 
+    async def delete_task(
+        self,
+        task_id: str,
+        user_id: Optional[str] = None
+    ) -> ToolResult:
+        """
+        Deletes a task by UUID or matching title from Supabase and in-memory fallback.
+        """
+        clean_id = (task_id or "").strip()
+        if not clean_id:
+            return ToolResult(
+                success=False,
+                data=None,
+                message="Se requiere el ID o nombre de la tarea para eliminarla."
+            )
+
+        deleted_title = clean_id
+        client = get_supabase_client()
+        if client:
+            if is_valid_uuid(clean_id):
+                try:
+                    query = client.table("tasks").delete().eq("id", clean_id)
+                    if user_id:
+                        query = query.eq("user_id", user_id)
+                    query.execute()
+                    self._tasks = [t for t in self._tasks if t.get("id") != clean_id]
+                    return ToolResult(
+                        success=True,
+                        data={"deleted_id": clean_id},
+                        message=f"Tarea '{clean_id}' eliminada exitosamente de la base de datos."
+                    )
+                except Exception as exc:
+                    print(f"[TOOL] Supabase delete_task by UUID failed: {exc}")
+            else:
+                # Search by title in Supabase
+                try:
+                    query = client.table("tasks").select("id, title").ilike("title", f"%{clean_id}%").limit(1)
+                    if user_id:
+                        query = query.eq("user_id", user_id)
+                    search_res = query.execute()
+                    if search_res and search_res.data:
+                        real_id = search_res.data[0]["id"]
+                        deleted_title = search_res.data[0].get("title", clean_id)
+                        client.table("tasks").delete().eq("id", real_id).execute()
+                        self._tasks = [t for t in self._tasks if t.get("id") != real_id]
+                        return ToolResult(
+                            success=True,
+                            data={"deleted_id": real_id, "title": deleted_title},
+                            message=f"Tarea '{deleted_title}' eliminada exitosamente de la base de datos."
+                        )
+                except Exception as exc:
+                    print(f"[TOOL] Supabase delete_task by title search failed: {exc}")
+
+        # In-memory fallback
+        target_clean = clean_id.lower()
+        matched_task = None
+        for t in self._tasks:
+            t_title = t.get("title", "").lower()
+            if t.get("id") == clean_id or t_title == target_clean or (target_clean and target_clean in t_title):
+                matched_task = t
+                break
+
+        if matched_task:
+            deleted_title = matched_task.get("title", clean_id)
+            self._tasks = [t for t in self._tasks if t.get("id") != matched_task.get("id")]
+            return ToolResult(
+                success=True,
+                data={"deleted_id": matched_task.get("id"), "title": deleted_title},
+                message=f"Tarea '{deleted_title}' eliminada exitosamente."
+            )
+
+        return ToolResult(
+            success=False,
+            data=None,
+            message=f"No se encontró la tarea con identificador o título '{clean_id}' para eliminar."
+        )
+
     async def execute(
         self,
         action: str = "list",
@@ -296,6 +399,12 @@ class TaskTools(BaseTool):
             if not tid:
                 return ToolResult(success=False, data=None, message="Se requiere el ID o nombre de la tarea para completarla.")
             return await self.complete_task(task_id=tid, user_id=user_id)
+
+        if action in ["delete", "remove", "eliminar", "borrar"]:
+            tid = task_id or title
+            if not tid:
+                return ToolResult(success=False, data=None, message="Se requiere el ID o nombre de la tarea para eliminarla.")
+            return await self.delete_task(task_id=tid, user_id=user_id)
 
         if action == "update":
             tid = task_id or title

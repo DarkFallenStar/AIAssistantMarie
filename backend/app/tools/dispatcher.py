@@ -73,6 +73,13 @@ class ToolDispatcher:
                 category=args.get("category", "general")
             )
 
+        elif normalized in ["delete_transaction", "remove_transaction", "eliminar_transaccion", "borrar_transaccion"]:
+            tx_id = args.get("transaction_id") or args.get("id")
+            return await self.transaction_tool.execute(
+                action="delete",
+                transaction_id=tx_id
+            )
+
         elif normalized in ["list_credit_cards", "get_credit_cards"]:
             return await self.credit_card_tool.execute(action="list")
 
@@ -122,6 +129,14 @@ class ToolDispatcher:
             target_task = args.get("task_id") or args.get("title") or args.get("name") or args.get("id")
             return await self.task_tool.execute(
                 action="complete",
+                task_id=target_task,
+                title=target_task
+            )
+
+        elif normalized in ["delete_task", "remove_task", "eliminar_tarea", "borrar_tarea"]:
+            target_task = args.get("task_id") or args.get("title") or args.get("name") or args.get("id")
+            return await self.task_tool.execute(
+                action="delete",
                 task_id=target_task,
                 title=target_task
             )

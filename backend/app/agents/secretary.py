@@ -134,6 +134,9 @@ class SecretaryAgent(BaseAgent):
                 id_match = re.search(r'(?:tarea|id)\s+([a-zA-Z0-9_-]+)', request)
                 tid = id_match.group(1) if id_match else request
                 tools_to_run.append(("task_tool", {"action": "complete", "task_id": tid, "title": tid}))
+            elif any(kw in req_lower for kw in ["elimina", "borra", "eliminar", "borrar", "quitar"]):
+                clean_title = re.sub(r'^(?:por favor,?\s*)?(?:elimina|borra|eliminar|borrar|quitar)\s*(?:la\s*)?tarea\s*(?:de\s*|llamada\s*)?', '', request, flags=re.IGNORECASE).strip()
+                tools_to_run.append(("task_tool", {"action": "delete", "task_id": clean_title, "title": clean_title}))
             elif any(kw in req_lower for kw in ["actualiza", "modifica", "cambia"]):
                 id_match = re.search(r'(?:tarea|id)\s+([a-zA-Z0-9_-]+)', request)
                 tid = id_match.group(1) if id_match else request

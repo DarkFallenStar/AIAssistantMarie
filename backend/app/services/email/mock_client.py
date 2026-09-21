@@ -103,11 +103,19 @@ class MockEmailClient(BaseEmailClient):
             except Exception as exc:
                 print(f"[EMAIL-MOCK] Supabase query failed ({exc}), using in-memory store")
 
+        default_mock_ids = {item["id"] for item in self.SEEDED_EMAILS}
         seen_ids = {m.id for m in supabase_results}
-        for em in self._emails:
-            if em.id not in seen_ids:
-                if not status or em.status == status:
-                    supabase_results.append(em)
+
+        if supabase_results:
+            for em in self._emails:
+                if em.id not in default_mock_ids and em.id not in seen_ids:
+                    if not status or em.status == status:
+                        supabase_results.append(em)
+        else:
+            for em in self._emails:
+                if em.id not in seen_ids:
+                    if not status or em.status == status:
+                        supabase_results.append(em)
 
         return supabase_results[:limit]
 

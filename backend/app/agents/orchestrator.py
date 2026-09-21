@@ -37,6 +37,7 @@ AGENTES DISPONIBLES:
      * "list_transactions": Consulta transacciones o movimientos recientes. Argumentos: {"category": null o string, "limit": 5}
      * "create_transaction": Registra un nuevo gasto o ingreso. Argumentos: {"amount": float, "type": "expense" | "income", "category": str, "description": str, "merchant": str, "currency": "COP" | "USD"}
      * "categorize_transaction": Modifica la categoría de una transacción. Argumentos: {"transaction_id": str, "category": str}
+     * "delete_transaction": Elimina una transacción por ID. Argumentos: {"transaction_id": str}
      * "list_credit_cards": Consulta tarjetas de crédito y saldo disponible. Argumentos: {}
      * "list_loans": Consulta préstamos, cuotas y deudas activas. Argumentos: {}
      * "list_saving_goals": Consulta metas de ahorro y progreso. Argumentos: {}
@@ -48,6 +49,7 @@ AGENTES DISPONIBLES:
      * "list_tasks": Lista tareas pendientes. Argumentos: {"status": "pending" o null, "limit": 5}
      * "create_task": Crea una nueva tarea. Argumentos: {"title": str, "due_date": str o null, "priority": "low" | "medium" | "high"}
      * "complete_task": Marca una tarea como completada. Argumentos: {"task_id": str}
+     * "delete_task": Elimina una tarea por ID o título. Argumentos: {"task_id": str}
      * "list_reminders": Lista recordatorios. Argumentos: {"timeframe": "all" | "today" | "upcoming", "limit": 5}
      * "create_reminder": Programa un recordatorio. Argumentos: {"title": str, "remind_at": str, "channel": "app"}
      * "list_unread_emails": Consulta correos no leídos pendientes. Argumentos: {"limit": 5}
