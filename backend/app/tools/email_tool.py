@@ -95,6 +95,8 @@ class EmailTools(BaseTool):
                 message=f"Error consultando correos no leídos: {exc}"
             )
 
+    list_unread_emails = list_unread
+
     async def list_emails(
         self,
         status: Optional[str] = None,

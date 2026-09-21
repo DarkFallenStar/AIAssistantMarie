@@ -195,3 +195,15 @@ SECRETARY AGENT       FINANCIAL AGENT           OTHER AGENTS...
    - In unit/integration tests and dynamic runtime reconfiguration, always reset `orchestrator.set_llm_service(None)` in both `setUp()` and `tearDown()` to prevent mock LLM instances or canned structured intents from leaking across distinct test files or runtime contexts.
 3. **Dual Pipeline Coexistence**:
    - The conversational pipeline (`Mobile -> Voice -> Backend -> STT -> Orchestrator -> Sub-Agents -> DB -> TTS -> Mobile`) and the passive notification pipeline (`Bank Push -> Webhook -> LLM Extraction -> DB -> Financial Agent`) operate concurrently without blocking, sharing state through the database layer.
+
+### L. Comprehensive Testing Suite & Multi-Agent Orchestration (Fase 19)
+1. **Multi-Agent Compound Intent Decomposition**:
+   - `StructuredIntent` supports `agent: "combined"` and an array of `actions: List[SubIntentAction]` to enable multi-agent workflows (e.g. creating a task in `SecretaryAgent` while computing cash flow or checking balances in `FinancialAgent` in a single conversational turn).
+   - In `OrchestratorService.process_user_input`, compound intents execute tools across multiple specialized agents sequentially, collect all operational outputs, and synthesize a cohesive unified response with `agent="MultiAgent"` and `intent="combined"`.
+2. **Coordinated Heuristic Classification**:
+   - Heuristic classification differentiates between single-agent statements with mixed vocabulary (e.g., *"Recuérdame comprar leche mañana en la tarde"*, which is strictly a reminder despite containing the verb *"comprar"*) and true multi-agent requests (e.g., *"Anota una tarea de pagar el alquiler y dime cuánto saldo tengo"*).
+   - Multi-agent intent detection verifies coordinating conjunctions (`y`, `además`, `también`, `pero`, `después`) and balanced keyword scores across domains.
+3. **Webhook Merchant Extraction Resilience**:
+   - In offline regex extraction, candidate phrases following prepositions (`en <X>`) must filter out purely numeric strings (such as card numbers *"terminada en 4321"*) and generic terms to accurately locate the real merchant name.
+4. **Mobile Testing Architecture**:
+   - Mobile flow tests execute natively via Node 22's built-in test runner (`node --test tests/mobile/*.test.mjs`), validating audio recording permissions, recorder state machines (`IDLE` -> `RECORDING` -> `PROCESSING` -> `RESPONSE` -> `IDLE`), network upload/chat payloads, message list updates, and markdown stripping for TTS without requiring external test runner dependencies.

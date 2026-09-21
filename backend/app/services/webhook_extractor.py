@@ -151,17 +151,20 @@ class BankWebhookExtractor:
 
         # 4. Merchant
         merchant = "Comercio"
-        en_match = re.search(r'\ben\s+([A-Za-z0-9\sáéíóúÁÉÍÓÚñÑ\.\-&]+?)(?:\s+(?:con|el|por|vía|via|desde|para)|$)', text, re.IGNORECASE)
-        if en_match:
-            candidate = en_match.group(1).strip()
-            if candidate and len(candidate) > 1 and candidate.lower() not in ["tarjeta", "cuenta", "efectivo", "banco"]:
+        en_matches = re.finditer(r'\ben\s+([A-Za-z0-9\sáéíóúÁÉÍÓÚñÑ\.\-&]+?)(?:\s+(?:con|el|por|vía|via|desde|para)|$|\.)', text, re.IGNORECASE)
+        for match in en_matches:
+            candidate = match.group(1).strip()
+            if candidate and len(candidate) > 1 and not candidate.isdigit() and candidate.lower() not in ["tarjeta", "cuenta", "efectivo", "banco", "la", "el"]:
                 merchant = candidate
-        else:
-            other_match = re.search(r'\b(?:de|a)\s+([A-Za-z0-9\sáéíóúÁÉÍÓÚñÑ\.\-&]+?)(?:\s+(?:con|el|por|vía|via|desde|para)|$)', text, re.IGNORECASE)
-            if other_match:
-                candidate = other_match.group(1).strip()
-                if candidate and len(candidate) > 1 and candidate.lower() not in ["tarjeta", "cuenta", "efectivo", "banco", "compra", "realizada"]:
+                break
+
+        if merchant == "Comercio":
+            other_matches = re.finditer(r'\b(?:de|a)\s+([A-Za-z0-9\sáéíóúÁÉÍÓÚñÑ\.\-&]+?)(?:\s+(?:con|el|por|vía|via|desde|para)|$|\.)', text, re.IGNORECASE)
+            for match in other_matches:
+                candidate = match.group(1).strip()
+                if candidate and len(candidate) > 1 and not candidate.isdigit() and candidate.lower() not in ["tarjeta", "cuenta", "efectivo", "banco", "compra", "realizada", "la", "el"]:
                     merchant = candidate
+                    break
 
         # 5. Payment method
         payment_method = "credit_card"

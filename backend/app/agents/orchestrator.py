@@ -8,7 +8,7 @@ from app.agents.base import BaseAgent, AgentResponse
 from app.agents.secretary import SecretaryAgent
 from app.agents.financial import FinancialAgent
 from app.agents.general import GeneralAgent
-from app.schemas.structured import StructuredIntent
+from app.schemas.structured import StructuredIntent, SubIntentAction
 from app.tools.dispatcher import get_tool_dispatcher, ToolDispatcher
 
 class OrchestratorResponse(BaseModel):
@@ -59,14 +59,23 @@ AGENTES DISPONIBLES:
      * "draft_email": Redacta un borrador de correo sin enviarlo. Argumentos: {"recipient": str, "subject": str, "body": str}
      * "send_email": Solicita enviar un correo (crea borrador y solicita confirmación previa). Argumentos: {"recipient": str, "subject": str, "body": str, "confirmed": false}
 
+4. "combined":
+   - Se utiliza cuando la petición del usuario contiene MÚLTIPLES intenciones o acciones de diferentes agentes (ej. Secretaría + Finanzas: "Anota una tarea de pagar la luz y dime cuánto dinero me queda en la cuenta").
+   - Para "combined", "tool" debe ser null y se incluye la lista "actions":
+     [
+       {"agent": "secretary", "tool": "create_task", "arguments": {"title": "Pagar la luz", "priority": "medium"}},
+       {"agent": "financial", "tool": "calculate_cash_flow", "arguments": {"period": "current_month"}}
+     ]
+
 REGLAS DE SALIDA:
 - Responde ÚNICAMENTE con un JSON válido.
 - NO agregues bloques ```json ni texto adicional antes o después del JSON.
 - Estructura JSON requerida:
 {
-  "agent": "financial" | "secretary" | "general",
+  "agent": "financial" | "secretary" | "general" | "combined",
   "tool": "<nombre_herramienta>" | null,
   "arguments": { ... },
+  "actions": [ ... ],
   "reasoning": "<breve justificación>"
 }
 """
@@ -136,16 +145,7 @@ class OrchestratorService:
             if re.search(r'\b' + re.escape(kw) + r'\b', text_clean) or kw in text_clean:
                 return "general"
 
-        # 2. Priority: Secretary actions
-        if any(kw in text_clean for kw in ["correo", "email", "decano", "recuerda", "recordar", "recordatorio", "anota"]):
-            return "secretary"
-
-        # 3. Word-boundary checks for financial & secretary keywords
-        secretary_score = 0
-        for kw in self.SECRETARY_KEYWORDS:
-            if re.search(r'\b' + re.escape(kw) + r'\b', text_clean):
-                secretary_score += 1
-
+        # 2. Score financial keywords
         financial_score = 0
         for kw in self.FINANCIAL_KEYWORDS:
             if re.search(r'\b' + re.escape(kw) + r'\b', text_clean):
@@ -155,18 +155,36 @@ class OrchestratorService:
         if re.search(r'\bcuentas?\b', text_clean) and not any(verb in text_clean for verb in ["cuentame", "cuentanos", "cuentale"]):
             financial_score += 1
 
+        # 3. Score secretary keywords
+        secretary_score = 0
+        for kw in self.SECRETARY_KEYWORDS:
+            if re.search(r'\b' + re.escape(kw) + r'\b', text_clean):
+                secretary_score += 1
+
+        if any(kw in text_clean for kw in ["correo", "email", "decano", "recuerda", "recordar", "recordatorio", "anota"]):
+            secretary_score += 1
+
+        # 4. Check for combined multi-agent intent (both secretary and financial present with coordination)
+        has_coordination = bool(re.search(r'\b(y|ademas|además|tambien|también|despues|después|pero)\b', text_clean))
+        if financial_score > 0 and secretary_score > 0:
+            if has_coordination or (financial_score >= 2 and secretary_score >= 2):
+                return "combined"
+
         if financial_score > secretary_score:
             return "financial"
         elif secretary_score > financial_score:
             return "secretary"
         elif financial_score > 0:
             return "financial"
+        elif secretary_score > 0:
+            return "secretary"
 
         return "general"
 
     async def extract_structured_intent(self, text: str) -> Optional[StructuredIntent]:
         """
-        Fase 11: Invokes LLM with Function Calling prompt to produce a structured JSON intent.
+        Fase 11 & 19: Invokes LLM with Function Calling prompt to produce a structured JSON intent.
+        Supports single-agent tools and combined multi-agent actions.
         """
         llm = self.get_llm()
         try:
@@ -186,7 +204,7 @@ class OrchestratorService:
 
             parsed = json.loads(clean_json)
             agent = parsed.get("agent", "general").lower()
-            if agent not in ["financial", "secretary", "general"]:
+            if agent not in ["financial", "secretary", "general", "combined", "multi", "multiagent"]:
                 agent = "general"
 
             tool = parsed.get("tool")
@@ -201,13 +219,45 @@ class OrchestratorService:
             if not isinstance(arguments, dict):
                 arguments = {}
 
+            # Parse sub-actions if combined intent
+            parsed_actions: Optional[List[SubIntentAction]] = None
+            raw_actions = parsed.get("actions")
+            if isinstance(raw_actions, list) and len(raw_actions) > 0:
+                agent = "combined"
+                parsed_actions = []
+                for act in raw_actions:
+                    if isinstance(act, dict):
+                        act_agent = act.get("agent", "general").lower()
+                        if act_agent not in ["financial", "secretary", "general"]:
+                            act_agent = "general"
+                        act_tool = act.get("tool")
+                        if act_tool and isinstance(act_tool, str):
+                            act_tool = act_tool.strip()
+                            if act_tool.lower() in ["null", "none", ""]:
+                                act_tool = None
+                        else:
+                            act_tool = None
+                        act_args = act.get("arguments", {})
+                        if not isinstance(act_args, dict):
+                            act_args = {}
+                        parsed_actions.append(SubIntentAction(
+                            agent=act_agent,
+                            tool=act_tool,
+                            arguments=act_args,
+                            reasoning=act.get("reasoning")
+                        ))
+
+            if agent in ["multi", "multiagent"]:
+                agent = "combined"
+
             structured = StructuredIntent(
                 agent=agent,
                 tool=tool,
                 arguments=arguments,
+                actions=parsed_actions,
                 reasoning=parsed.get("reasoning")
             )
-            print(f"[FUNCTION-CALLING] Parsed StructuredIntent: agent={structured.agent}, tool={structured.tool}, args={structured.arguments}")
+            print(f"[FUNCTION-CALLING] Parsed StructuredIntent: agent={structured.agent}, tool={structured.tool}, args={structured.arguments}, actions={len(parsed_actions) if parsed_actions else 0}")
             return structured
 
         except Exception as exc:
@@ -270,7 +320,10 @@ class OrchestratorService:
         # -------------------------------------------------------------
         if not use_llm:
             intent = self.classify_intent(trimmed)
-            if intent == "financial":
+            if intent == "combined":
+                fallback = f"He recibido tu solicitud combinada: '{trimmed}'. Coordinando las acciones entre Secretaría y Finanzas."
+                agent_name = "MultiAgent"
+            elif intent == "financial":
                 fallback = f"He recibido tu consulta financiera: '{trimmed}'. Analizando tus cuentas y saldo disponible."
                 agent_name = self.financial_agent.name
             elif intent == "secretary":
@@ -307,6 +360,78 @@ class OrchestratorService:
         intent = structured_intent.agent
         tool_name = structured_intent.tool
         tool_args = structured_intent.arguments
+
+        # -------------------------------------------------------------
+        # Step 2.5: Combined / Multi-Agent Execution Pipeline (Fase 19)
+        # -------------------------------------------------------------
+        if intent == "combined" or (structured_intent and structured_intent.actions):
+            actions = structured_intent.actions if (structured_intent and structured_intent.actions) else []
+            if not actions:
+                # Heuristic decomposition if no explicit sub-actions extracted
+                actions = []
+                clean_t = self.normalize_text(trimmed)
+                if any(w in clean_t for w in ["tarea", "anota", "recordatorio", "recuerda", "agenda", "pendiente"]):
+                    actions.append(SubIntentAction(agent="secretary", tool="create_task", arguments={"title": trimmed, "priority": "medium"}))
+                elif any(w in clean_t for w in ["correo", "email", "buzon"]):
+                    actions.append(SubIntentAction(agent="secretary", tool="list_unread_emails", arguments={"limit": 5}))
+
+                if any(w in clean_t for w in ["saldo", "dinero", "flujo", "disponible", "quedan", "cuenta"]):
+                    actions.append(SubIntentAction(agent="financial", tool="calculate_cash_flow", arguments={"period": "current_month"}))
+                elif any(w in clean_t for w in ["gasto", "gaste", "compre", "transaccion", "movimiento"]):
+                    actions.append(SubIntentAction(agent="financial", tool="list_transactions", arguments={"limit": 5}))
+                elif any(w in clean_t for w in ["tarjeta", "credito"]):
+                    actions.append(SubIntentAction(agent="financial", tool="list_credit_cards", arguments={}))
+                elif any(w in clean_t for w in ["meta", "ahorro"]):
+                    actions.append(SubIntentAction(agent="financial", tool="list_saving_goals", arguments={}))
+
+            executed_tools = []
+            tool_outputs = []
+            for act in actions:
+                if act.tool:
+                    print(f"[ORCHESTRATOR-MULTI] Executing combined tool '{act.tool}' for agent '{act.agent}'...")
+                    res = await self.dispatcher.dispatch(act.tool, act.arguments)
+                    executed_tools.append(act.tool)
+                    tool_outputs.append({
+                        "agent": act.agent,
+                        "tool": act.tool,
+                        "message": res.message,
+                        "data": res.data
+                    })
+                    if res.data and isinstance(res.data, dict) and res.data.get("requires_confirmation"):
+                        self._pending_confirmation = res.data
+
+            combined_summary = "\n".join([f"- [{out['agent'].capitalize()} - {out['tool']}]: {out['message']}" for out in tool_outputs])
+
+            augmented_prompt = (
+                f"Consulta del usuario: '{trimmed}'\n\n"
+                f"Herramientas ejecutadas de múltiples agentes para resolver integralmente la solicitud:\n"
+                f"{combined_summary}\n\n"
+                f"Instrucción: Genera una respuesta coordinada, ejecutiva y clara en español, confirmando las acciones realizadas de ambos agentes."
+            )
+            system_prompt = (
+                "Eres el Orquestador Central Multi-Agente del Asistente Personal Inteligente. "
+                "Tu labor es unificar las acciones realizadas por los agentes de Secretaría y Finanzas en una respuesta clara, profesional y concisa."
+            )
+
+            try:
+                llm = self.get_llm()
+                resp = await llm.generate(prompt=augmented_prompt, system_prompt=system_prompt)
+                final_text = resp.text
+                llm_used = True
+            except Exception as exc:
+                print(f"[ORCHESTRATOR-MULTI] LLM synthesis failed ({exc}). Using direct tool summary fallback.")
+                final_text = f"He coordinado y procesado tus solicitudes:\n{combined_summary}"
+                llm_used = False
+
+            return OrchestratorResponse(
+                input_text=trimmed,
+                intent="combined",
+                agent="MultiAgent",
+                response=final_text,
+                llm_used=llm_used,
+                tools_executed=executed_tools,
+                structured_intent=structured_intent
+            )
 
         # -------------------------------------------------------------
         # Step 3: Handle Pure Conversational Interaction (No Tool / General Agent)
