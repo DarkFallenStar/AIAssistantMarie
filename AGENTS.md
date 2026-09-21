@@ -65,6 +65,7 @@ SECRETARY AGENT       FINANCIAL AGENT           OTHER AGENTS...
 1. **Windows Console Encoding**: NEVER write emojis or raw UTF-8 symbols in `print()` statements destined for Windows stdout (causes `UnicodeEncodeError: 'charmap' codec can't encode characters` in cp1252). Use ASCII tags like `[VOICE]`, `[API]`, `[DB]`.
 2. **Multipart Uploads**: ALWAYS ensure `python-multipart` is listed in requirements and installed in `.venv` for any file upload endpoint.
 3. **Auto-reload in Development**: ALWAYS invoke `uvicorn.run("app.main:app", ..., reload=True)` passing the import string so file modifications take effect immediately without orphan processes or port collisions.
+4. **Orphan Processes & Socket Collision on Windows**: If backend requests do not appear in console logs, ALWAYS check `netstat -ano | findstr :8000`. Windows allows ghost/zombie Python instances to retain bound sockets in `CLOSE_WAIT` or dual-LISTEN, hijacking incoming packets from mobile clients without forwarding them to the active terminal process. Kill dangling PIDs using `Stop-Process -Id <PID> -Force`.
 
 ### C. LLM & Connectivity (Learned Gotchas)
 1. **Google AI Studio Credentials & Models**:
