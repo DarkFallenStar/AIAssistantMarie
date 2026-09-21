@@ -1,18 +1,20 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 
 export interface ChatMessage {
   id: string;
   sender: 'user' | 'assistant';
   text: string;
   timestamp: string;
+  audio_url?: string;
 }
 
 interface MessageBubbleProps {
   message: ChatMessage;
+  onSpeak?: (text: string) => void;
 }
 
-export default function MessageBubble({ message }: MessageBubbleProps) {
+export default function MessageBubble({ message, onSpeak }: MessageBubbleProps) {
   const isUser = message.sender === 'user';
 
   return (
@@ -29,14 +31,26 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
         ]}
       >
         <View style={styles.senderHeader}>
-          <Text
-            style={[
-              styles.senderText,
-              isUser ? styles.userSenderText : styles.assistantSenderText,
-            ]}
-          >
-            {isUser ? 'TÚ' : 'ASISTENTE'}
-          </Text>
+          <View style={styles.senderLeft}>
+            <Text
+              style={[
+                styles.senderText,
+                isUser ? styles.userSenderText : styles.assistantSenderText,
+              ]}
+            >
+              {isUser ? 'TÚ' : 'ASISTENTE'}
+            </Text>
+            {!isUser && onSpeak && (
+              <TouchableOpacity
+                onPress={() => onSpeak(message.text)}
+                style={styles.speakerButton}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityLabel="Escuchar respuesta"
+              >
+                <Text style={styles.speakerIcon}>🔊</Text>
+              </TouchableOpacity>
+            )}
+          </View>
           <Text style={styles.timestampText}>{message.timestamp}</Text>
         </View>
         <Text style={[styles.messageText, isUser ? styles.userMessageText : styles.assistantMessageText]}>
@@ -91,6 +105,11 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     gap: 8,
   },
+  senderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   senderText: {
     fontSize: 10,
     fontWeight: '800',
@@ -101,6 +120,15 @@ const styles = StyleSheet.create({
   },
   assistantSenderText: {
     color: '#6ee7b7',
+  },
+  speakerButton: {
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  speakerIcon: {
+    fontSize: 12,
   },
   timestampText: {
     fontSize: 9,

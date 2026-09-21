@@ -4,9 +4,10 @@ import MessageBubble, { ChatMessage } from './MessageBubble';
 
 interface MessageListProps {
   messages: ChatMessage[];
+  onSpeak?: (text: string) => void;
 }
 
-export default function MessageList({ messages }: MessageListProps) {
+export default function MessageList({ messages, onSpeak }: MessageListProps) {
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -39,7 +40,7 @@ export default function MessageList({ messages }: MessageListProps) {
       ref={flatListRef}
       data={messages}
       keyExtractor={(item) => item.id}
-      renderItem={({ item }) => <MessageBubble message={item} />}
+      renderItem={({ item }) => <MessageBubble message={item} onSpeak={onSpeak} />}
       contentContainerStyle={styles.listContent}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"

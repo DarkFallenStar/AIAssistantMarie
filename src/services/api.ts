@@ -16,6 +16,7 @@ export interface ChatResponse {
     arguments?: Record<string, any>;
     reasoning?: string;
   };
+  audio_url?: string;
 }
 
 export interface DatabaseStatusResponse {
@@ -181,6 +182,41 @@ export interface VoiceResponse {
   intent?: string;
   message: string;
   response: string;
+  audio_url?: string;
+}
+
+/**
+ * Requests backend to synthesize TTS audio for given text (POST /tts?as_json=true).
+ */
+export async function requestTTS(
+  baseUrl: string,
+  text: string,
+  timeoutMs: number = 10000
+): Promise<{ status: string; audio_url: string; text: string }> {
+  const url = `${normalizeUrl(baseUrl)}/tts?as_json=true`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ text }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+    return await res.json();
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    throw new Error(err.message || "Error al sintetizar TTS en backend");
+  }
 }
 
 /**

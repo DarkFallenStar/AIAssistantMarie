@@ -141,3 +141,14 @@ SECRETARY AGENT       FINANCIAL AGENT           OTHER AGENTS...
    - `BaseEmailClient` provides an abstract interface for email operations (`list_unread`, `search_emails`, `send_email`, `create_draft`).
    - `ImapEmailClient` connects to IMAP (with SSL support) and SMTP for real-world mailboxes.
    - `MockEmailClient` provides deterministic offline/testing operation and seamless Supabase database synchronization.
+
+### G. Text-To-Speech (TTS) & Audio Presentation
+1. **Persistent Text Display**:
+   - The textual response MUST ALWAYS remain visible in the conversation list regardless of whether speech audio is played.
+2. **Markdown Stripping for Speech**:
+   - Before passing assistant response text to the TTS engine (`expo-speech` or backend), markdown syntax (`**bold**`, `# header`, `*bullet*`, etc.) must be stripped via `stripMarkdownForTTS(text)` so the voice synthesizer pronounces natural words rather than punctuation characters.
+3. **Audio Collision Prevention**:
+   - Starting a new voice recording or sending a text message must immediately stop any active speech playback (`Speech.stop()`).
+4. **Backend TTS Sizing & MIME Types**:
+   - The `/tts` endpoint and static audio handler must always stream standard `audio/wav` with valid RIFF headers and non-zero byte size to ensure compatibility with mobile players.
+

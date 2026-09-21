@@ -20,6 +20,7 @@ import {
   setAudioModeAsync,
   useAudioRecorderState,
 } from 'expo-audio';
+import * as Speech from 'expo-speech';
 import StatusBadge, { AssistantState } from '../components/StatusBadge';
 import MessageList from '../components/MessageList';
 import { ChatMessage } from '../components/MessageBubble';
@@ -32,6 +33,23 @@ interface AssistantScreenProps {
   onOpenDiagnostics?: () => void;
 }
 
+/**
+ * Strips markdown symbols (bold, italic, headers, backticks, bullet asterisks)
+ * so that TTS synthesizes smooth, natural speech without reading characters like '*' or '#'.
+ */
+function stripMarkdownForTTS(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/(\*\*|__)(.*?)\1/g, '$2')
+    .replace(/(\*|_)(.*?)\1/g, '$2')
+    .replace(/`{1,3}(.*?)`{1,3}/g, '$1')
+    .replace(/^#+\s+/gm, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[-*+]\s+/g, '')
+    .replace(/^\s*\d+\.\s+/gm, '')
+    .trim();
+}
+
 export default function AssistantScreen({
   backendUrl = DEFAULT_BACKEND_URL,
   onOpenDiagnostics,
@@ -40,6 +58,7 @@ export default function AssistantScreen({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isTTSActive, setIsTTSActive] = useState<boolean>(true);
 
   // Inicializar grabador nativo de Expo Audio SDK 57
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
@@ -56,6 +75,10 @@ export default function AssistantScreen({
         console.warn('Error configurando modo de audio inicial:', err);
       }
     })();
+
+    return () => {
+      Speech.stop();
+    };
   }, []);
 
   const getFormattedTime = () => {
@@ -65,10 +88,23 @@ export default function AssistantScreen({
   const isRecording = state === 'RECORDING' || state === 'grabando';
   const isProcessing = state === 'PROCESSING' || state === 'procesando';
 
+  const speakResponse = (text: string) => {
+    if (!isTTSActive || !text || !text.trim()) return;
+    const clean = stripMarkdownForTTS(text);
+    Speech.stop();
+    Speech.speak(clean, {
+      language: 'es-ES',
+      rate: 1.0,
+      pitch: 1.0,
+    });
+  };
+
   const handleSendMessage = async (textToSend: string) => {
     const trimmed = textToSend.trim();
     if (!trimmed || isProcessing) return;
 
+    // Detener cualquier audio previo antes de procesar el nuevo mensaje
+    Speech.stop();
     setErrorMessage(null);
 
     // 1. Mensaje del usuario
@@ -98,7 +134,10 @@ export default function AssistantScreen({
       };
       setMessages((prev) => [...prev, assistantMsg]);
 
-      // 5. Retorno a IDLE
+      // 5. Síntesis Text To Speech (TTS) para que el usuario escuche la respuesta
+      speakResponse(reply);
+
+      // 6. Retorno a IDLE
       setTimeout(() => {
         setState('IDLE');
       }, 1800);
@@ -110,7 +149,7 @@ export default function AssistantScreen({
       const errorMsg: ChatMessage = {
         id: Math.random().toString(),
         sender: 'assistant',
-        text: `⚠️ No se pudo obtener respuesta del backend. Verifica que el servidor FastAPI esté encendido en ${backendUrl}.`,
+        text: `⚠️ No se pudo obtener respuesta del backend. Verifica que el servidor esté encendido en ${backendUrl}.`,
         timestamp: getFormattedTime(),
       };
       setMessages((prev) => [...prev, errorMsg]);
@@ -118,6 +157,9 @@ export default function AssistantScreen({
   };
 
   const handleMicPress = async () => {
+    // Detener cualquier audio previo
+    Speech.stop();
+
     if (!isRecording) {
       // 1. Solicitar permiso de grabación de audio nativo
       const permissionStatus = await AudioModule.requestRecordingPermissionsAsync();
@@ -201,7 +243,10 @@ export default function AssistantScreen({
         };
         setMessages((prev) => [...prev, assistantMsg]);
 
-        // 8. Retorno a IDLE
+        // 8. Síntesis Text To Speech (TTS) para escuchar la respuesta
+        speakResponse(voiceResult.response);
+
+        // 9. Retorno a IDLE
         setTimeout(() => {
           setState('IDLE');
         }, 2500);
@@ -222,6 +267,7 @@ export default function AssistantScreen({
   };
 
   const handleCancelRecording = async () => {
+    Speech.stop();
     if (!isRecording) return;
     try {
       await audioRecorder.stop();
@@ -254,6 +300,20 @@ export default function AssistantScreen({
           </View>
 
           <View style={styles.headerRight}>
+            <TouchableOpacity
+              style={[styles.ttsToggleButton, isTTSActive ? styles.ttsActiveBtn : styles.ttsMutedBtn]}
+              onPress={() => {
+                if (isTTSActive) {
+                  Speech.stop();
+                }
+                setIsTTSActive((prev) => !prev);
+              }}
+              activeOpacity={0.7}
+              accessibilityLabel={isTTSActive ? "Desactivar síntesis de voz" : "Activar síntesis de voz"}
+            >
+              <Text style={styles.ttsToggleText}>{isTTSActive ? '🔊 Voz' : '🔇 Mute'}</Text>
+            </TouchableOpacity>
+
             {onOpenDiagnostics && (
               <TouchableOpacity
                 style={styles.diagButton}
@@ -283,7 +343,7 @@ export default function AssistantScreen({
         {/* Conversation Area (Message List) */}
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
           <View style={styles.chatArea}>
-            <MessageList messages={messages} />
+            <MessageList messages={messages} onSpeak={(text) => speakResponse(text)} />
           </View>
         </TouchableWithoutFeedback>
 
@@ -413,6 +473,26 @@ const styles = StyleSheet.create({
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+  },
+  ttsToggleButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  ttsActiveBtn: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderColor: '#10b981',
+  },
+  ttsMutedBtn: {
+    backgroundColor: 'rgba(107, 114, 128, 0.15)',
+    borderColor: '#6b7280',
+  },
+  ttsToggleText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#e5e7eb',
   },
   diagButton: {
     backgroundColor: '#1e293b',

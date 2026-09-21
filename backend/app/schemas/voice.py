@@ -10,3 +10,4 @@ class VoiceUploadResponse(BaseModel):
     intent: Optional[str] = None
     message: str
     response: str
+    audio_url: Optional[str] = None

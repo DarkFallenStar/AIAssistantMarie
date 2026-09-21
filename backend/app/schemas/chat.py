@@ -10,3 +10,4 @@ class ChatResponse(BaseModel):
     agent: Optional[str] = Field(default=None, description="Nombre del agente que generó la respuesta")
     tools_executed: Optional[List[str]] = Field(default_factory=list, description="Lista de herramientas ejecutadas")
     structured_intent: Optional[Dict[str, Any]] = Field(default=None, description="Intención estructurada extraída (Function Calling)")
+    audio_url: Optional[str] = Field(default=None, description="URL del audio sintetizado TTS")

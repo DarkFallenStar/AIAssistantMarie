@@ -2,6 +2,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 from pathlib import Path
 from app.schemas.voice import VoiceUploadResponse
 from app.audio.stt import get_stt_service
+from app.audio.tts import get_tts_service
 from app.agents.orchestrator import get_orchestrator_service
 
 router = APIRouter()
@@ -14,6 +15,7 @@ async def upload_voice(file: UploadFile = File(...)):
     """
     Recibe el archivo binario de audio grabado desde la aplicación móvil.
     Convierte el audio a texto (Speech To Text) y lo pasa como entrada al Orquestador.
+    Sintetiza la respuesta en audio mediante TTS (Fase 13).
     """
     if not file.filename:
         raise HTTPException(status_code=400, detail="No se proporciono archivo de audio.")
@@ -42,6 +44,16 @@ async def upload_voice(file: UploadFile = File(...)):
     # 2. Entrada al Orquestador con soporte LLM
     orchestrator = get_orchestrator_service()
     orchestrator_result = await orchestrator.process_user_input(transcribed_text, use_llm=True)
+
+    # 3. Síntesis Text To Speech (TTS)
+    audio_url = None
+    try:
+        tts = get_tts_service()
+        if orchestrator_result.response and orchestrator_result.response.strip():
+            audio_file = tts.synthesize(orchestrator_result.response)
+            audio_url = f"/static/audio/tts/{audio_file.name}"
+    except Exception as exc:
+        print(f"[VOICE] Error en sintesis TTS: {exc}")
     
     return VoiceUploadResponse(
         status="success",
@@ -52,4 +64,5 @@ async def upload_voice(file: UploadFile = File(...)):
         intent=orchestrator_result.intent,
         message=f"Audio procesado correctamente. Transcripcion: '{transcribed_text}'",
         response=orchestrator_result.response,
+        audio_url=audio_url,
     )
