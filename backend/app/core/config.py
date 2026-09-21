@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api"
     HOST: str = "0.0.0.0"
     PORT: int = 8000
+    ENVIRONMENT: str = "development"
     
     # CORS: Allow all origins by default for mobile development and Tailscale
     CORS_ORIGINS: List[str] = ["*"]
@@ -18,7 +19,7 @@ class Settings(BaseSettings):
     
     # Google AI Studio (Fallback)
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-2.0-flash"
+    GEMINI_MODEL: str = "gemini-3.6-flash"
     
     # Supabase / PostgreSQL Database Settings
     SUPABASE_URL: str = ""
@@ -28,8 +29,15 @@ class Settings(BaseSettings):
     # Bank Webhook Security
     BANK_WEBHOOK_SECRET: str = ""
     
+    # Speech To Text (Whisper) Settings
+    WHISPER_MODEL_SIZE: str = "tiny"
+    WHISPER_DEVICE: str = "cpu"
+    WHISPER_COMPUTE_TYPE: str = "int8"
+    
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"
 
+# Global settings singleton (reloaded)
 settings = Settings()

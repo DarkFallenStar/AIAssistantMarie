@@ -7,9 +7,9 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  SafeAreaView,
   StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { DEFAULT_BACKEND_URL, DEFAULT_LAN_IP, DEFAULT_PORT } from '../config';
 import { checkBackendHealth, sendChatMessage, HealthResponse, normalizeUrl } from '../services/api';
 
@@ -20,8 +20,23 @@ interface LogEntry {
   message: string;
 }
 
-export default function ConnectionDiagnosticScreen() {
-  const [backendUrl, setBackendUrl] = useState<string>(DEFAULT_BACKEND_URL);
+export interface ConnectionDiagnosticScreenProps {
+  initialUrl?: string;
+  onUrlChange?: (newUrl: string) => void;
+  onBackToAssistant?: () => void;
+}
+
+export default function ConnectionDiagnosticScreen({
+  initialUrl = DEFAULT_BACKEND_URL,
+  onUrlChange,
+  onBackToAssistant,
+}: ConnectionDiagnosticScreenProps = {}) {
+  const [backendUrl, setBackendUrlState] = useState<string>(initialUrl);
+
+  const setBackendUrl = (newUrl: string) => {
+    setBackendUrlState(newUrl);
+    onUrlChange?.(newUrl);
+  };
   const [isLoadingHealth, setIsLoadingHealth] = useState<boolean>(false);
   const [healthData, setHealthData] = useState<HealthResponse | null>(null);
   const [healthError, setHealthError] = useState<string | null>(null);
@@ -84,11 +99,23 @@ export default function ConnectionDiagnosticScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#090d16" />
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+      >
         
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerSubtitle}>FASE 2 • BACKEND MÍNIMO</Text>
+          {onBackToAssistant && (
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={onBackToAssistant}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.backBtnText}>◀ Volver al Asistente</Text>
+            </TouchableOpacity>
+          )}
+          <Text style={styles.headerSubtitle}>FASE 2 • DIAGNÓSTICO DE RED</Text>
           <Text style={styles.headerTitle}>Personal Assistant AI</Text>
           <Text style={styles.headerDescription}>
             Pruebas de endpoints GET /health y POST /chat
@@ -273,6 +300,21 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 18,
+  },
+  backBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#1e293b',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  backBtnText: {
+    color: '#38bdf8',
+    fontSize: 12,
+    fontWeight: '600',
   },
   headerSubtitle: {
     color: '#38bdf8',

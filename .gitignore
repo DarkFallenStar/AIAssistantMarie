@@ -59,3 +59,7 @@ Thumbs.db
 *.mobileprovision
 .vscode/
 .idea/
+
+# Uploads & Temporary Audio
+uploads/
+backend/uploads/
