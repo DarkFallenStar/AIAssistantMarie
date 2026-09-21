@@ -187,4 +187,11 @@ SECRETARY AGENT       FINANCIAL AGENT           OTHER AGENTS...
 5. **Mobile-Backend Auth Parity**:
    - Maintain 100% parity between `src/services/api.ts` and `mobile/src/services/api.ts`. Both attach `getAuthHeaders()` to all protected backend calls and inject `X-Webhook-Secret` into bank webhooks.
 
-
+### K. Full End-to-End System Integration (Fase 18)
+1. **Cross-Module Transaction State Parity**:
+   - In both live Supabase PostgreSQL and offline in-memory fallback, transaction storage in `TransactionTools` (`_shared_transactions`) and `CashFlowTools` must remain 100% synchronized across `webhooks.py`, `FinancialAgent`, and `ToolDispatcher`.
+   - When a bank notification is ingested via `POST /webhooks/bank`, any subsequent voice or chat query to the Financial Agent immediately includes the transaction and reflects it in liquid balance calculations.
+2. **Orchestrator LLM State Hygiene**:
+   - In unit/integration tests and dynamic runtime reconfiguration, always reset `orchestrator.set_llm_service(None)` in both `setUp()` and `tearDown()` to prevent mock LLM instances or canned structured intents from leaking across distinct test files or runtime contexts.
+3. **Dual Pipeline Coexistence**:
+   - The conversational pipeline (`Mobile -> Voice -> Backend -> STT -> Orchestrator -> Sub-Agents -> DB -> TTS -> Mobile`) and the passive notification pipeline (`Bank Push -> Webhook -> LLM Extraction -> DB -> Financial Agent`) operate concurrently without blocking, sharing state through the database layer.

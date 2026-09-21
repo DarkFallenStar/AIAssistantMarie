@@ -84,6 +84,19 @@ class CashFlowTools(BaseTool):
             accounts = [dict(a) for a in self.MOCK_ACCOUNTS]
             total_income = self.MOCK_MONTHLY_SUMMARY["monthly_income"]
             total_expenses = self.MOCK_MONTHLY_SUMMARY["monthly_expenses"]
+            try:
+                from app.tools.transaction_tool import TransactionTools
+                tx_tool = TransactionTools()
+                default_ids = {t["id"] for t in TransactionTools.MOCK_TRANSACTIONS}
+                for tx in tx_tool._transactions:
+                    if tx.get("id") not in default_ids:
+                        amt = float(tx.get("amount", 0.0))
+                        if tx.get("type") == "expense":
+                            total_expenses += amt
+                        elif tx.get("type") == "income":
+                            total_income += amt
+            except Exception as exc:
+                print(f"[TOOL] CashFlowTools fallback tx calculation error: {exc}")
 
         total_liquid = sum(a["balance"] for a in accounts)
         net_cash_flow = total_income - total_expenses

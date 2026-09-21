@@ -55,8 +55,16 @@ class TransactionTools(BaseTool):
         }
     ]
 
+    _shared_transactions: Optional[List[Dict[str, Any]]] = None
+
     def __init__(self):
-        self._transactions: List[Dict[str, Any]] = [dict(tx) for tx in self.MOCK_TRANSACTIONS]
+        if TransactionTools._shared_transactions is None:
+            TransactionTools._shared_transactions = [dict(tx) for tx in self.MOCK_TRANSACTIONS]
+        self._transactions = TransactionTools._shared_transactions
+
+    @classmethod
+    def reset_mock_data(cls):
+        cls._shared_transactions = [dict(tx) for tx in cls.MOCK_TRANSACTIONS]
 
     @property
     def name(self) -> str:
