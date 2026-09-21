@@ -50,10 +50,14 @@ AGENTES DISPONIBLES:
      * "complete_task": Marca una tarea como completada. Argumentos: {"task_id": str}
      * "list_reminders": Lista recordatorios. Argumentos: {"timeframe": "all" | "today" | "upcoming", "limit": 5}
      * "create_reminder": Programa un recordatorio. Argumentos: {"title": str, "remind_at": str, "channel": "app"}
+     * "list_unread_emails": Consulta correos no leídos pendientes. Argumentos: {"limit": 5}
      * "list_emails": Consulta correos recibidos. Argumentos: {"status": "unread" o null, "limit": 5}
      * "get_email": Lee un correo específico por ID. Argumentos: {"email_id": str}
      * "search_emails": Busca correos por remitente o asunto. Argumentos: {"search": str}
-     * "draft_email": Redacta un borrador de correo. Argumentos: {"recipient": str, "subject": str, "body": str}
+     * "summarize_email": Genera resumen ejecutivo de un correo específico o por búsqueda. Argumentos: {"query": str o null, "email_id": str o null}
+     * "prioritize_emails": Clasifica y ordena los correos por nivel de prioridad o urgencia. Argumentos: {"limit": 5}
+     * "draft_email": Redacta un borrador de correo sin enviarlo. Argumentos: {"recipient": str, "subject": str, "body": str}
+     * "send_email": Solicita enviar un correo (crea borrador y solicita confirmación previa). Argumentos: {"recipient": str, "subject": str, "body": str, "confirmed": false}
 
 REGLAS DE SALIDA:
 - Responde ÚNICAMENTE con un JSON válido.
@@ -102,6 +106,7 @@ class OrchestratorService:
         self.financial_agent = FinancialAgent(llm_service=self._llm_service)
         self.general_agent = GeneralAgent(llm_service=self._llm_service)
         self.dispatcher = get_tool_dispatcher()
+        self._pending_confirmation: Optional[Dict[str, Any]] = None
 
     def set_llm_service(self, llm_service: Optional[BaseLLMService]):
         self._llm_service = llm_service
@@ -227,6 +232,40 @@ class OrchestratorService:
             )
 
         # -------------------------------------------------------------
+        # Step 0: Check Pending Human-in-the-Loop Confirmation (Fase 12)
+        # -------------------------------------------------------------
+        if self._pending_confirmation is not None:
+            clean_input = self.normalize_text(trimmed)
+            if any(w in clean_input for w in ["si", "sí", "enviar", "confirmo", "adelante", "procede", "enviarlo", "mándalo", "mandalo", "confirmar", "ok"]):
+                pending = self._pending_confirmation
+                self._pending_confirmation = None
+                print(f"[ORCHESTRATOR] Human confirmed email dispatch to {pending.get('recipient')}")
+                send_res = await self.dispatcher.dispatch("send_email", {
+                    "recipient": pending.get("recipient"),
+                    "subject": pending.get("subject"),
+                    "body": pending.get("body"),
+                    "confirmed": True
+                })
+                return OrchestratorResponse(
+                    input_text=trimmed,
+                    intent="secretary",
+                    agent=self.secretary_agent.name,
+                    response=send_res.message,
+                    llm_used=True,
+                    tools_executed=["send_email"]
+                )
+            elif any(w in clean_input for w in ["no", "cancela", "cancelar", "no enviar", "detener", "abortar"]):
+                self._pending_confirmation = None
+                return OrchestratorResponse(
+                    input_text=trimmed,
+                    intent="secretary",
+                    agent=self.secretary_agent.name,
+                    response="Envío de correo cancelado por el usuario. El borrador permanece guardado.",
+                    llm_used=False,
+                    tools_executed=[]
+                )
+
+        # -------------------------------------------------------------
         # Deterministic / Fast Mode (Without LLM calls)
         # -------------------------------------------------------------
         if not use_llm:
@@ -312,10 +351,25 @@ class OrchestratorService:
         # -------------------------------------------------------------
         # Step 4 & 5: Tool Execution via ToolDispatcher
         # -------------------------------------------------------------
+        tools_executed = [tool_name]
         print(f"[ORCHESTRATOR] Executing tool '{tool_name}' with args {tool_args}...")
         tool_result = await self.dispatcher.dispatch(tool_name, tool_args)
-        tools_executed = [tool_name]
-        print(f"[ORCHESTRATOR] Tool result: success={tool_result.success}, msg={tool_result.message}")
+        safe_msg = str(tool_result.message).encode('ascii', 'replace').decode('ascii')
+        print(f"[ORCHESTRATOR] Tool result: success={tool_result.success}, msg={safe_msg}")
+
+        # Check if tool requires explicit human confirmation before proceeding
+        if tool_result.data and isinstance(tool_result.data, dict) and tool_result.data.get("requires_confirmation"):
+            self._pending_confirmation = tool_result.data
+            print(f"[ORCHESTRATOR] Tool requires human confirmation: {tool_result.data}")
+            return OrchestratorResponse(
+                input_text=trimmed,
+                intent=intent,
+                agent=self.secretary_agent.name if intent == "secretary" else self.general_agent.name,
+                response=tool_result.message,
+                llm_used=True,
+                tools_executed=[tool_name],
+                structured_intent=structured_intent
+            )
 
         # -------------------------------------------------------------
         # Step 6 & 7: Synthesis of Natural Response with LLM

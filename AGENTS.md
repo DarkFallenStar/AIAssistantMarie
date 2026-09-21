@@ -132,5 +132,12 @@ SECRETARY AGENT       FINANCIAL AGENT           OTHER AGENTS...
      c) Agent orchestration & LLM synthesis (`POST /chat`).
    - This isolates whether an issue stems from local networking, backend process crashes, or database outages.
 
-
-
+### F. Email Integration & Human-in-the-Loop Safeguards
+1. **Mandatory Human Confirmation**:
+   - The Assistant must NEVER automatically dispatch emails without explicit confirmation from the user (`confirmed=True`).
+   - When a user requests sending an email, the backend prepares a draft and sets `requires_confirmation: True`, presenting recipient, subject, and content to the user.
+   - Dispatch only executes when the user confirms with affirmative input ("sí", "confirmo", "envíalo", "adelante"). If the user cancels or says "no", the pending email draft is cleanly discarded.
+2. **Extensible Email Client Architecture**:
+   - `BaseEmailClient` provides an abstract interface for email operations (`list_unread`, `search_emails`, `send_email`, `create_draft`).
+   - `ImapEmailClient` connects to IMAP (with SSL support) and SMTP for real-world mailboxes.
+   - `MockEmailClient` provides deterministic offline/testing operation and seamless Supabase database synchronization.

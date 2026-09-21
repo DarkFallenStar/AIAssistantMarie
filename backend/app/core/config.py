@@ -35,6 +35,13 @@ class Settings(BaseSettings):
     WHISPER_MODEL_SIZE: str = "tiny"
     WHISPER_DEVICE: str = "cpu"
     WHISPER_COMPUTE_TYPE: str = "int8"
+
+    # Official Email / IMAP Settings (Fase 12)
+    IMAP_HOST: str = ""
+    IMAP_PORT: int = 993
+    IMAP_USER: str = ""
+    IMAP_PASSWORD: str = ""
+    IMAP_USE_SSL: bool = True
     
     class Config:
         env_file = ".env"

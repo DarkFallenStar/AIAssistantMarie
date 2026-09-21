@@ -150,6 +150,12 @@ class ToolDispatcher:
                 limit=int(args.get("limit", 5))
             )
 
+        elif normalized in ["list_unread_emails", "unread_emails", "correos_no_leidos"]:
+            return await self.email_tool.execute(
+                action="unread",
+                limit=int(args.get("limit", 5))
+            )
+
         elif normalized in ["get_email"]:
             return await self.email_tool.execute(
                 action="get",
@@ -162,12 +168,34 @@ class ToolDispatcher:
                 search=args.get("search", "")
             )
 
+        elif normalized in ["summarize_email", "summarize_emails", "resumir_correo"]:
+            return await self.email_tool.execute(
+                action="summarize",
+                email_id=args.get("email_id"),
+                search=args.get("query") or args.get("search")
+            )
+
+        elif normalized in ["prioritize_emails", "priorizar_correos"]:
+            return await self.email_tool.execute(
+                action="prioritize",
+                limit=int(args.get("limit", 5))
+            )
+
         elif normalized in ["draft_email", "create_draft_email"]:
             return await self.email_tool.execute(
                 action="draft",
                 recipient=args.get("recipient", "contacto@empresa.com"),
                 subject=args.get("subject", "Sin asunto"),
                 body=args.get("body", "")
+            )
+
+        elif normalized in ["send_email", "enviar_correo"]:
+            return await self.email_tool.execute(
+                action="send",
+                recipient=args.get("recipient", "contacto@empresa.com"),
+                subject=args.get("subject", "Sin asunto"),
+                body=args.get("body", ""),
+                confirmed=bool(args.get("confirmed", False))
             )
 
         # -----------------------------------------------------------------
