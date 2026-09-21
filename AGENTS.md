@@ -207,3 +207,21 @@ SECRETARY AGENT       FINANCIAL AGENT           OTHER AGENTS...
    - In offline regex extraction, candidate phrases following prepositions (`en <X>`) must filter out purely numeric strings (such as card numbers *"terminada en 4321"*) and generic terms to accurately locate the real merchant name.
 4. **Mobile Testing Architecture**:
    - Mobile flow tests execute natively via Node 22's built-in test runner (`node --test tests/mobile/*.test.mjs`), validating audio recording permissions, recorder state machines (`IDLE` -> `RECORDING` -> `PROCESSING` -> `RESPONSE` -> `IDLE`), network upload/chat payloads, message list updates, and markdown stripping for TTS without requiring external test runner dependencies.
+
+### M. Full System Testing & Verification Playbook (Fase 20 Readiness)
+1. **Automated Suite Baseline**:
+   - Backend: 166 unit/integration tests (`& "backend/.venv/Scripts/python.exe" -m unittest discover -s tests -p "test_*.py" -v` in `backend/`).
+   - Mobile: 10 state-machine/logic unit tests (`node --test tests/mobile/test_mobile_assistant.test.mjs`).
+   - Total: 176 automated tests passing at 100% green.
+2. **Network Topology & Verified IPs**:
+   - Local Wi-Fi (LAN): `192.168.40.15:8000`
+   - Tailscale (Encrypted Mesh VPN): `100.95.54.56:8000`
+   - Parity: Both `src/config/index.ts` and `mobile/src/config/index.ts` default to these addresses with 1-tap switching in `ConnectionDiagnosticScreen.tsx`.
+3. **Step-by-Step Live Execution Playbook**:
+   - Step 1: Start Backend -> `& "backend/.venv/Scripts/python.exe" backend/run.py` (listens on `0.0.0.0:8000`).
+   - Step 2: Start Mobile -> `npx expo start` and scan QR in Expo Go on Android device.
+   - Step 3: Diagnostic Check -> In mobile app, tap "Diagnóstico de Red" to verify Backend, Database, and Chat/LLM health.
+   - Step 4: Voice & Secretary Test -> Hold Mic button or type: "Anota una tarea urgente para entregar reporte mañana". Verify task persistence and TTS voice response.
+   - Step 5: Financial Test -> Hold Mic button or type: "¿Cuánto dinero tengo disponible este mes?". Verify cash flow calculation.
+   - Step 6: Bank Notification Simulation -> In mobile app, tap "Centro de Notificaciones Bancarias" -> tap "Bancolombia ($45.000 COP)". Verify transaction receipt, then ask assistant for recent expenses.
+   - Step 7: Compound Intent Test -> Submit: "Anota comprar repuestos y dime cuánto saldo me queda". Verify sequential multi-agent orchestration.

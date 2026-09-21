@@ -139,7 +139,8 @@ PersonalAssistantAI/
    - Abre `mobile/src/config/index.ts` (o `src/config/index.ts`).
    - Define tu IP local (o tu IP de Tailscale):
      ```typescript
-     export const DEFAULT_LAN_IP = "192.168.1.137"; // Cambia por la IP de tu PC
+     export const DEFAULT_LAN_IP = "192.168.40.15"; // Tu IP local Wi-Fi
+     export const DEFAULT_TAILSCALE_IP = "100.95.54.56"; // Tu IP de Tailscale
      export const DEFAULT_PORT = "8000";
      export const DEFAULT_BACKEND_URL = `http://${DEFAULT_LAN_IP}:${DEFAULT_PORT}`;
      ```
@@ -156,13 +157,30 @@ PersonalAssistantAI/
 
 ---
 
-### 4. Verificación y Pruebas Automatizadas
+### 4. Verificación y Pruebas Automatizadas (176 Pruebas)
 
-Puedes ejecutar la suite completa de pruebas unitarias e integración en el backend:
+Puedes ejecutar la suite completa de pruebas unitarias e integración en el backend y cliente móvil:
 
+#### Pruebas Backend (166 tests):
 ```powershell
 cd backend
-.venv\Scripts\python.exe -m unittest discover -s tests
+.venv\Scripts\python.exe -m unittest discover -s tests -p "test_*.py" -v
 ```
 
-*Verifica endpoints de salud, conexión a base de datos, captura de voz y Speech-to-Text (Whisper), capa LLM y fallback de orquestador.*
+#### Pruebas Móviles (10 tests):
+```powershell
+node --test tests/mobile/test_mobile_assistant.test.mjs
+```
+
+---
+
+### 5. Guía Rápida de Prueba Integral de la Aplicación
+
+1. **Levantar el Backend**: `backend\.venv\Scripts\python.exe backend\run.py`
+2. **Levantar Expo Mobile**: `npx expo start` y abrir Expo Go.
+3. **Pantalla Diagnóstico**: Toca **"Diagnóstico de Red"** en la app para verificar Backend, Supabase y LLM en verde (1 toque para alternar entre Wi-Fi y Tailscale).
+4. **Prueba Secretaria**: Envía *"Anota una tarea urgente para entregar reporte mañana"* (voz o texto).
+5. **Prueba Financiera**: Envía *"¿Cuánto saldo me queda este mes?"*.
+6. **Prueba Webhook Bancario**: Entra al **"Centro de Notificaciones Bancarias"** y pulsa *"Bancolombia ($45.000 COP)"*. Luego pregunta al asistente por tus últimos gastos.
+7. **Prueba Multi-Agente Combinada**: Envía *"Anota comprar repuestos para el carro y dime cuánto saldo tengo"*.
+
