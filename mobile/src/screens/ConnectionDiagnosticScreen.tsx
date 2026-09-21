@@ -10,7 +10,13 @@ import {
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { DEFAULT_BACKEND_URL, DEFAULT_LAN_IP, DEFAULT_PORT } from '../config';
+import {
+  DEFAULT_BACKEND_URL,
+  DEFAULT_LAN_IP,
+  DEFAULT_PORT,
+  DEFAULT_TAILSCALE_IP,
+  DEFAULT_TAILSCALE_URL,
+} from '../config';
 import {
   checkBackendHealth,
   checkDatabaseStatus,
@@ -317,7 +323,10 @@ export default function ConnectionDiagnosticScreen({
 
           <View style={styles.presetsRow}>
             <TouchableOpacity
-              style={styles.presetBtn}
+              style={[
+                styles.presetBtn,
+                backendUrl.includes(DEFAULT_LAN_IP) && styles.presetBtnActive,
+              ]}
               onPress={() => {
                 const url = `http://${DEFAULT_LAN_IP}:${DEFAULT_PORT}`;
                 setBackendUrl(url);
@@ -325,7 +334,23 @@ export default function ConnectionDiagnosticScreen({
                 testDatabase(url);
               }}
             >
-              <Text style={styles.presetBtnText}>IP LAN ({DEFAULT_LAN_IP})</Text>
+              <Text style={styles.presetBtnText}>🏠 LAN Wi-Fi</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.presetBtn,
+                styles.presetTailscaleBtn,
+                backendUrl.includes(DEFAULT_TAILSCALE_IP) && styles.presetTailscaleBtnActive,
+              ]}
+              onPress={() => {
+                const url = `http://${DEFAULT_TAILSCALE_IP}:${DEFAULT_PORT}`;
+                setBackendUrl(url);
+                testHealth(url);
+                testDatabase(url);
+              }}
+            >
+              <Text style={styles.presetTailscaleText}>🔒 Tailscale (4G/Remoto)</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -337,7 +362,7 @@ export default function ConnectionDiagnosticScreen({
                 testDatabase(url);
               }}
             >
-              <Text style={styles.presetBtnText}>Emulador (10.0.2.2)</Text>
+              <Text style={styles.presetBtnText}>📱 Emulador</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -553,6 +578,7 @@ const styles = StyleSheet.create({
   responseLabel: {
     color: '#64748b',
     fontSize: 11,
+    marginBottom: 6,
   },
   responseBubble: {
     backgroundColor: '#1e293b',
@@ -598,6 +624,23 @@ const styles = StyleSheet.create({
     color: '#cbd5e1',
     fontSize: 11,
     fontWeight: '500',
+  },
+  presetBtnActive: {
+    borderColor: '#10b981',
+    backgroundColor: '#064e3b',
+  },
+  presetTailscaleBtn: {
+    backgroundColor: '#0f172a',
+    borderColor: '#0284c7',
+  },
+  presetTailscaleText: {
+    color: '#38bdf8',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  presetTailscaleBtnActive: {
+    borderColor: '#38bdf8',
+    backgroundColor: '#0c4a6e',
   },
   buttonDisabled: {
     opacity: 0.6,

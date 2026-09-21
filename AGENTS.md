@@ -157,7 +157,14 @@ SECRETARY AGENT       FINANCIAL AGENT           OTHER AGENTS...
    - In Expo Go (standard client), arbitrary native Java/Kotlin services (`NotificationListenerService`) cannot be executed without `expo prebuild`.
    - For live workshop testing on physical devices, use **MacroDroid** (or Automate/Tasker) which natively binds `NotificationListenerService` and dispatches HTTP `POST` requests to `/webhooks/bank` via Tailscale/LAN.
    - For in-app simulation, `NotificationAutomationScreen.tsx` provides presets and real-time transaction monitoring with direct feedback from the LLM Structured Output.
-2. **ISO 8601 Date Resiliency in Webhook Extractors**:
-   - LLMs can return non-standard date strings (e.g. "ahora", "hoy"). Webhook extractors MUST always validate and parse dates to valid ISO 8601 strings (`datetime.now(timezone.utc).isoformat()`) before inserting into PostgreSQL columns of type `timestamp with time zone`.
+### I. Tailscale Private Remote Networking (Fase 16)
+1. **Host Network Binding**:
+   - FastAPI (`backend/app/core/config.py`) maintains `HOST="0.0.0.0"`, automatically binding to loopback (`127.0.0.1`), LAN Wi-Fi (`192.168.x.x`), and Tailscale adapter (`100.x.y.z`).
+2. **Zero Public Port Forwarding**:
+   - Tailscale creates an end-to-end encrypted WireGuard overlay mesh network (CGNAT `100.64.0.0/10`). No ports need to be opened on residential or external routers.
+3. **Mobile Dual-Network Ergonomics**:
+   - `ConnectionDiagnosticScreen.tsx` provides 1-tap switching between `[🏠 LAN Wi-Fi]` and `[🔒 Tailscale (4G/Remoto)]`, maintaining 100% parity between `src/` and `mobile/src/`.
+4. **CLI Process Hygiene on Windows**:
+   - Never leave blocking `tailscale up` or `tailscale login` CLI processes lingering in background without timeouts; the native Windows GUI (`tailscale-ipn.exe`) handles interactive authentication seamlessly.
 
 
