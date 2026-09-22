@@ -137,13 +137,15 @@ MINIMAL_TRANSACTIONS = [
     }
 ]
 
-def clean_and_reseed():
+import argparse
+
+def clean_and_reseed(empty_only: bool = False):
     client = get_supabase_client()
     if not client:
         print("[CLEAN-DB] Error: No Supabase client configured.")
         return
 
-    print("[CLEAN-DB] Iniciando purga de tablas en orden relacional...")
+    print(f"[CLEAN-DB] Iniciando purga de tablas en orden relacional (empty_only={empty_only})...")
 
     # 1. Purgar tablas dependientes
     tables_to_purge = [
@@ -158,53 +160,64 @@ def clean_and_reseed():
 
     for table in tables_to_purge:
         try:
-            # Borrar todos los registros donde user_id no sea nulo (o id != '')
-            # En Supabase postgREST, .neq("id", "00000000-0000-0000-0000-000000000000") borra todos
+            # Borrar todos los registros donde id != nil UUID
             res = client.table(table).delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
             count = len(res.data) if res.data else 0
             print(f"  -> Tabla '{table}' purgada ({count} registros eliminados).")
         except Exception as e:
             print(f"  [WARN] Error purgando '{table}': {e}")
 
-    print("\n[CLEAN-DB] Sembrando conjunto mínimo y limpio de datos...")
-
-    # Sembrar Usuario
+    # Sembrar y asegurar Usuario Principal
     client.table("users").upsert(MINIMAL_USER).execute()
-    print("  + Usuario principal sembrado.")
+    # Eliminar usuarios secundarios o residuales de tests
+    try:
+        client.table("users").delete().neq("id", DEFAULT_USER_ID).execute()
+    except Exception as e:
+        print(f"  [WARN] Error limpiando usuarios secundarios: {e}")
+    print("  + Usuario principal verificado y sembrado (DEFAULT_USER_ID).")
 
-    # Sembrar Cuenta Financiera
-    client.table("financial_accounts").upsert(MINIMAL_ACCOUNT).execute()
-    print("  + 1 Cuenta bancaria principal sembrada.")
+    if empty_only:
+        print("\n[CLEAN-DB] Modo vaciado total activo: No se insertarán registros adicionales.")
+    else:
+        print("\n[CLEAN-DB] Sembrando conjunto mínimo y limpio de datos...")
 
-    # Sembrar Tarjeta de Crédito
-    client.table("credit_cards").upsert(MINIMAL_CARD).execute()
-    print("  + 1 Tarjeta de crédito sembrada.")
+        # Sembrar Cuenta Financiera
+        client.table("financial_accounts").upsert(MINIMAL_ACCOUNT).execute()
+        print("  + 1 Cuenta bancaria principal sembrada.")
 
-    # Sembrar Meta de Ahorro
-    client.table("saving_goals").upsert(MINIMAL_GOAL).execute()
-    print("  + 1 Meta de ahorro sembrada.")
+        # Sembrar Tarjeta de Crédito
+        client.table("credit_cards").upsert(MINIMAL_CARD).execute()
+        print("  + 1 Tarjeta de crédito sembrada.")
 
-    # Sembrar Tareas (2)
-    for t in MINIMAL_TASKS:
-        client.table("tasks").upsert(t).execute()
-    print("  + 2 Tareas limpias sembradas.")
+        # Sembrar Meta de Ahorro
+        client.table("saving_goals").upsert(MINIMAL_GOAL).execute()
+        print("  + 1 Meta de ahorro sembrada.")
 
-    # Sembrar Correos (2)
-    for e in MINIMAL_EMAILS:
-        client.table("emails").upsert(e).execute()
-    print("  + 2 Correos limpios sembrados.")
+        # Sembrar Tareas (2)
+        for t in MINIMAL_TASKS:
+            client.table("tasks").upsert(t).execute()
+        print("  + 2 Tareas limpias sembradas.")
 
-    # Sembrar Transacciones (3)
-    for tx in MINIMAL_TRANSACTIONS:
-        client.table("transactions").upsert(tx).execute()
-    print("  + 3 Transacciones COP limpias sembradas.")
+        # Sembrar Correos (2)
+        for e in MINIMAL_EMAILS:
+            client.table("emails").upsert(e).execute()
+        print("  + 2 Correos limpios sembrados.")
+
+        # Sembrar Transacciones (3)
+        for tx in MINIMAL_TRANSACTIONS:
+            client.table("transactions").upsert(tx).execute()
+        print("  + 3 Transacciones COP limpias sembradas.")
 
     print("\n[CLEAN-DB] Verificación de conteo final en Supabase:")
     for table in ["users", "tasks", "emails", "financial_accounts", "credit_cards", "saving_goals", "transactions"]:
         cnt = client.table(table).select("id", count="exact").execute().count
         print(f"  - {table}: {cnt} registros.")
 
-    print("\n[CLEAN-DB] ¡Base de datos limpia y re-sembrada con éxito!")
+    mode_label = "vaciada completamente (0 datos)" if empty_only else "re-sembrada con datos mínimos"
+    print(f"\n[CLEAN-DB] ¡Base de datos {mode_label} con éxito!")
 
 if __name__ == "__main__":
-    clean_and_reseed()
+    parser = argparse.ArgumentParser(description="Limpieza y gestión de base de datos Supabase")
+    parser.add_argument("--empty", "--purge-all", action="store_true", dest="empty", help="Deja la base de datos completamente vacía (0 registros, solo usuario base)")
+    args = parser.parse_args()
+    clean_and_reseed(empty_only=args.empty)
