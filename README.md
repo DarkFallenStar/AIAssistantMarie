@@ -4,6 +4,28 @@ Sistema integral de asistencia personal móvil con arquitectura desacoplada mult
 
 ---
 
+## 📌 Repositorio de Código Fuente y Organización del Proyecto
+
+- **Repositorio Oficial en GitHub**: [https://github.com/DarkFallenStar/AIAssistantMarie](https://github.com/DarkFallenStar/AIAssistantMarie)
+- **Código Fuente Comentado y Arquitectura Modular**:
+  - `mobile/`: Aplicación móvil completa desarrollada en React Native con Expo SDK 57, TypeScript estricto, gestión de permisos nativos de audio (`expo-audio`), componentes responsivos con desplazamiento ergonómico de teclado y cliente API tipado. Todo el código cuenta con comentarios técnicos, tipado estricto y separación limpia entre pantallas, componentes y servicios.
+  - `backend/`: Servidor asíncrono en FastAPI (Python 3.10+) con código extensamente documentado y tipado (Pydantic V2), motor Speech-to-Text Whisper, síntesis TTS WAV, orquestador multi-agente con intents compuestos, catálogo de herramientas (`tools/`), capa de failover LLM y webhook bancario.
+  - `database/`: Esquema relacional DDL (`schema.sql`) para Supabase PostgreSQL 15+ y datos iniciales de prueba (`seeds.sql`).
+  - `docs/`: Documentación técnica especializada.
+
+---
+
+## 📐 Documento Técnico de Arquitectura
+
+El documento técnico de arquitectura principal se encuentra en **[`docs/architecture.md`](docs/architecture.md)** e incluye:
+1. **Diagrama de Arquitectura General**: Topología por capas del sistema modelada en Mermaid.
+2. **Diagramas de Secuencia Interactivos**:
+   - *Flujo conversacional por voz*: Captura de audio -> Whisper STT -> Orquestador -> Sub-agente -> Tools -> Supabase -> Síntesis TTS -> Reproducción en el móvil.
+   - *Flujo de ingesta bancaria*: Notificación push Android -> MacroDroid -> Webhook POST por Tailscale -> Extracción estructurada LLM -> Inserción en DB -> Sincronización contable.
+3. **Esquema Relacional de Base de Datos Implementado**: Diagrama Entidad-Relación (ER en Mermaid) con las 8 tablas relacionales (`users`, `tasks`, `emails`, `financial_accounts`, `credit_cards`, `loans`, `saving_goals`, `transactions`), atributos, tipos y cardinalidades (con desglose detallado de diccionario de datos en [`docs/database.md`](docs/database.md)).
+
+---
+
 ## 1. Descripción General
 
 El **Asistente Personal Inteligente Multi-Agente** ha sido diseñado como una solución de productividad integral y privacidad primero, estructurado en 20 fases continuas de ingeniería bajo la metodología **Spec-Driven Development (SDD)**.

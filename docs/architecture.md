@@ -278,7 +278,148 @@ sequenceDiagram
 
 ---
 
-## 4. Desglose de Capas del Sistema
+## 4. Esquema Relacional de Base de Datos Implementado
+
+El sistema persiste su información en una base de datos relacional **PostgreSQL 15+** alojada en **Supabase**. A continuación se detalla el **Diagrama Entidad-Relación (ER)** completo de las 8 tablas implementadas, sus atributos clave y cardinalidades:
+
+```mermaid
+erDiagram
+    USERS ||--o{ TASKS : "crea / gestiona"
+    USERS ||--o{ EMAILS : "recibe / envía"
+    USERS ||--o{ FINANCIAL_ACCOUNTS : "posee"
+    USERS ||--o{ CREDIT_CARDS : "mantiene"
+    USERS ||--o{ LOANS : "adquiere"
+    USERS ||--o{ SAVING_GOALS : "fija"
+    USERS ||--o{ TRANSACTIONS : "ejecuta"
+    FINANCIAL_ACCOUNTS ||--o{ TRANSACTIONS : "debitada / acreditada"
+    CREDIT_CARDS ||--o{ TRANSACTIONS : "cargada"
+
+    USERS {
+        uuid id PK "gen_random_uuid()"
+        varchar email UK "Email único del usuario"
+        varchar full_name "Nombre completo"
+        varchar phone_number "Número de teléfono opcional"
+        jsonb preferences "Preferencias de moneda e idioma"
+        timestamptz created_at "Fecha de creación"
+        timestamptz updated_at "Fecha de última modificación"
+    }
+
+    TASKS {
+        uuid id PK "gen_random_uuid()"
+        uuid user_id FK "users(id) ON DELETE CASCADE"
+        varchar title "Título de la tarea o recordatorio"
+        text description "Detalles o notas adicionales"
+        varchar status "pending | in_progress | completed | cancelled"
+        varchar priority "low | medium | high | urgent"
+        varchar category "general | reminder | work | personal"
+        timestamptz due_date "Fecha límite de cumplimiento"
+        timestamptz completed_at "Fecha en que se marcó completada"
+        timestamptz created_at "Fecha de registro"
+        timestamptz updated_at "Fecha de actualización"
+    }
+
+    EMAILS {
+        uuid id PK "gen_random_uuid()"
+        uuid user_id FK "users(id) ON DELETE CASCADE"
+        varchar sender "Dirección remitente"
+        varchar recipient "Dirección destinatario"
+        varchar subject "Asunto del correo"
+        text body "Cuerpo del mensaje"
+        varchar snippet "Resumen corto"
+        varchar status "unread | read | archived | starred | spam"
+        varchar category "general | finance | work | personal | promotions | alerts"
+        timestamptz received_at "Fecha de recepción"
+        boolean is_important "Bandera de importancia"
+        timestamptz created_at "Fecha de inserción"
+        timestamptz updated_at "Fecha de actualización"
+    }
+
+    FINANCIAL_ACCOUNTS {
+        uuid id PK "gen_random_uuid()"
+        uuid user_id FK "users(id) ON DELETE CASCADE"
+        varchar account_name "Nombre descriptivo de la cuenta"
+        varchar account_type "checking | savings | investment | cash | digital_wallet"
+        varchar institution "Entidad (Bancolombia, Nequi, Davivienda)"
+        varchar account_number_mask "Máscara ej: **** 1234"
+        numeric balance "Saldo líquido actual"
+        varchar currency "COP | USD"
+        varchar status "active | inactive | frozen | closed"
+        timestamptz created_at "Fecha de apertura"
+        timestamptz updated_at "Fecha de actualización"
+    }
+
+    CREDIT_CARDS {
+        uuid id PK "gen_random_uuid()"
+        uuid user_id FK "users(id) ON DELETE CASCADE"
+        varchar card_name "Nombre de la tarjeta (ej. Visa Oro)"
+        varchar institution "Banco emisor"
+        varchar card_number_mask "Máscara ej: **** 4321"
+        numeric credit_limit "Cupo total otorgado"
+        numeric current_balance "Saldo consumido / deuda actual"
+        numeric available_credit "Cupo disponible (calculado)"
+        varchar currency "COP | USD"
+        smallint cutoff_day "Día de corte del extracto (1-31)"
+        smallint due_day "Día límite de pago mensual (1-31)"
+        varchar status "active | blocked | cancelled | expired"
+        timestamptz created_at "Fecha de registro"
+        timestamptz updated_at "Fecha de actualización"
+    }
+
+    LOANS {
+        uuid id PK "gen_random_uuid()"
+        uuid user_id FK "users(id) ON DELETE CASCADE"
+        varchar lender_name "Entidad crediticia o prestamista"
+        varchar loan_type "personal | mortgage | auto | student | business"
+        numeric original_amount "Monto inicial desembolsado"
+        numeric remaining_balance "Saldo pendiente por pagar"
+        numeric interest_rate_annual "Tasa de interés EA (%)"
+        numeric monthly_payment "Cuota fija mensual"
+        smallint payment_day "Día límite de pago (1-31)"
+        date start_date "Fecha de desembolso"
+        date end_date "Fecha estimada de finalización"
+        varchar status "active | paid_off | defaulted | refinanced"
+        timestamptz created_at "Fecha de registro"
+        timestamptz updated_at "Fecha de actualización"
+    }
+
+    SAVING_GOALS {
+        uuid id PK "gen_random_uuid()"
+        uuid user_id FK "users(id) ON DELETE CASCADE"
+        varchar goal_name "Nombre de la meta de ahorro"
+        numeric target_amount "Monto objetivo a ahorrar"
+        numeric current_amount "Monto acumulado hasta la fecha"
+        varchar currency "COP | USD"
+        date deadline "Fecha límite estimada"
+        varchar status "in_progress | completed | paused | cancelled"
+        timestamptz created_at "Fecha de creación"
+        timestamptz updated_at "Fecha de actualización"
+    }
+
+    TRANSACTIONS {
+        uuid id PK "gen_random_uuid()"
+        uuid user_id FK "users(id) ON DELETE CASCADE"
+        uuid account_id FK "financial_accounts(id) ON DELETE SET NULL"
+        uuid credit_card_id FK "credit_cards(id) ON DELETE SET NULL"
+        varchar type "income | expense | transfer"
+        numeric amount "Valor monetario de la operación"
+        varchar currency "COP | USD"
+        varchar category "Categoría del gasto o ingreso"
+        varchar description "Concepto del movimiento"
+        varchar merchant "Comercio o receptor"
+        timestamptz transaction_date "Fecha y hora del movimiento"
+        varchar status "pending | posted | cancelled | refunded"
+        varchar source "manual | webhook_bank | voice_agent | email_import"
+        jsonb metadata "Detalles del webhook o carga cruda"
+        timestamptz created_at "Fecha de registro"
+        timestamptz updated_at "Fecha de actualización"
+    }
+```
+
+> 📖 Para el diccionario de datos exhaustivo, tipos de índices, reglas de eliminación y triggers, consulta el documento técnico especializado [docs/database.md](database.md).
+
+---
+
+## 5. Desglose de Capas del Sistema
 
 ### A. Capa de Presentación Móvil (React Native + Expo)
 - **Estructura y Tipado**: Totalmente desarrollado en TypeScript estricto. Mantiene paridad 100% entre `src/` y `mobile/src/`.
