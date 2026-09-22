@@ -134,13 +134,15 @@ class TestFinancialAgentAndTools(unittest.TestCase):
         goal = res.data["goals"][0]
         self.assertIn("progress_percentage", goal)
 
-        # Update amount
+        # Update amount to 50% of target
+        target = float(goal.get("target_amount") or 5000.0)
+        target_half = round(target * 0.5, 2)
         update_res = asyncio.run(tool.update_saving_goal(
             goal_id=goal["id"],
-            current_amount=2500.00
+            current_amount=target_half
         ))
         self.assertTrue(update_res.success)
-        self.assertEqual(update_res.data["current_amount"], 2500.00)
+        self.assertEqual(update_res.data["current_amount"], target_half)
         self.assertEqual(update_res.data["progress_percentage"], 50.0)
 
     def test_saving_goal_tools_backward_compatibility(self):

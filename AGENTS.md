@@ -288,3 +288,16 @@ SECRETARY AGENT       FINANCIAL AGENT           OTHER AGENTS...
    - Default query limits in tool schemas and system prompts are maintained at 20 to 50 items (not 5 or 10), ensuring complete lists of user tasks and transactions are returned.
 4. **Test Suite Database Isolation**:
    - Automated test suites running against live database credentials must include explicit tear-down cleanup routines (`tearDownClass`, `delete_task`, `delete_transaction`) so tests never pollute production tables with test artifacts.
+
+### S. Comprehensive System Documentation & Architectural Specification (Fase 21)
+1. **Central Onboarding & SSOT**:
+   - `README.md` acts as the exhaustive 14-section entry point for any developer or user, covering overview, architecture diagram, requirements, backend/Expo execution, Supabase, Ollama/Gemini dual failover, Tailscale mesh VPN, MacroDroid bank automation, automated test execution, and troubleshooting.
+2. **Specialized Technical Docs in `docs/`**:
+   - `docs/architecture.md`: Full architectural breakdown, component topology, and two interactive sequence diagrams in Mermaid (conversational voice pipeline and bank notification webhook pipeline).
+   - `docs/database.md`: Complete Supabase PostgreSQL relational schema, Mermaid Entity-Relationship (ER) diagram (`erDiagram`) across all 8 tables, full data dictionary, constraints, triggers, and CRUD REST APIs.
+   - `docs/api.md`: Comprehensive OpenAPI REST contracts for all endpoints (`/health`, `/chat`, `/voice`, `/tts`, `/webhooks/bank`, `/db/*`), Bearer token security, and standardized error schemas.
+   - `docs/agents.md`: Multi-agent orchestration architecture, hybrid classification (LLM Structured Output + heuristic fallback), compound multi-agent intent decomposition (`agent: "combined"`), tool catalogs, and anti-hallucination grounding in COP currency.
+   - `docs/deployment.md`: Operational deployment guide for local development (Windows host), Tailscale WireGuard mesh VPN, Supabase Cloud, and Expo Go / Standalone APK compilation.
+3. **Resilient Mock Fallbacks for Clean Databases**:
+   - When unit tests evaluate tools (`loan_tool`, `saving_goal_tool`) in pristine or cleaned environments where live database tables contain 0 rows, tools and tests must dynamically fall back to default fixtures or compute relative percentages to guarantee deterministic test assertions.
+

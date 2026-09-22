@@ -69,7 +69,7 @@ class LoanTools(BaseTool):
                 print(f"[TOOL] Supabase get_loans failed ({exc}), using mock fallback")
                 db_success = False
 
-        if not db_success:
+        if not db_success or not loans:
             loans = [dict(l) for l in self._loans]
 
         total_debt = sum(l["remaining_balance"] for l in loans)

@@ -70,7 +70,7 @@ class SavingGoalTools(BaseTool):
                 print(f"[TOOL] Supabase get_saving_goals failed ({exc}), using mock fallback")
                 db_success = False
 
-        if not db_success:
+        if not db_success or not goals:
             for g in self._goals:
                 if not status or g.get("status") == status:
                     target = float(g.get("target_amount", 0))
